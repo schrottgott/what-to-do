@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  What-To-Do  —  Version 1.1 (13.11.2026)
+  ============================================================
+  Ideen- und Vorschlags-Tool: Themengebiete anlegen
+  (z.B. "Essen", "Abendbeschäftigung"), Einträge erfassen,
+  per Zufall einen Vorschlag ziehen. Zu jedem Eintrag können
+  Anhänge hinterlegt werden: Text, Bild, Datei (kein Video),
+  Audio (Upload oder Mikrofonaufnahme, WebM/Opus).
+  Max. 10 MB pro Anhang.
+
+  VERSIONSHISTORIE
+  ----------------
+  v1.1 (13.11.2026)
+    - "Nochmal ziehen" entfernt (gleiche Funktion wie
+      "Vorschlag ziehen")
+    - Import kann jetzt ZUSAMMENFÜHREN statt nur ersetzen:
+      Gebiete und Einträge werden anhand des Namens abgeglichen,
+      Anhänge werden kombiniert (Duplikate nach Name+Inhalt
+      bleiben einmalig). So lassen sich Sicherungen von zwei
+      Geräten vereinen, ohne Daten zu verlieren. "Ersetzen"
+      ist weiterhin als Option verfügbar.
+  v1.0 (13.11.2026)
+    - Erste Version
+    - 3 Ebenen: Themengebiete -> Einträge -> Zufallsziehung
+    - Reiner Zufall, Ausschluss durch erneutes Ziehen
+    - Anhänge: Text / Bild / Datei / Audio (Upload + Aufnahme)
+    - Speicherung in IndexedDB ("what-to-do-db", Store "kv")
+    - Sofortspeichern bei jeder Änderung; Notfallspeichern bei
+      pagehide/beforeunload/visibilitychange
+    - JSON-Export/Import (alles inkl. Anhänge, Base64)
+    - Hilfe-Dialog; rote Warnung bei Speicherproblemen
+    - Design angelehnt an Still-Tracker v20
+  ============================================================
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>What-To-Do</title>
+<style>
+  :root{
+    --bg:#f6eee7; --panel:#fffaf5; --red:#bd6553; --gold:#cfa75f;
+    --gold-light:#d9b989; --ink:#3d2f28; --muted:#8a7568; --line:#e4d6c9;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       padding-bottom:90px}
+  header{background:var(--red);color:#fff;padding:14px 16px;display:flex;
+         align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font-size:1.15rem;font-weight:600}
+  .hbtn{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;
+        padding:7px 11px;font-size:.85rem;cursor:pointer;margin-left:6px}
+  main{max-width:640px;margin:0 auto;padding:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+        padding:14px;margin-bottom:12px}
+  .card h2{margin:0 0 10px;font-size:1rem}
+  button{font-family:inherit}
+  .btn{background:var(--gold);border:none;color:#fff;border-radius:9px;padding:10px 14px;
+       font-size:.95rem;cursor:pointer}
+  .btn.red{background:var(--red)}
+  .btn.ghost{background:transparent;color:var(--red);border:1px solid var(--red)}
+  .btn.small{padding:6px 10px;font-size:.82rem}
+  input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;
+       background:#fff;font-size:.95rem}
+  .area-list .item{display:flex;align-items:center;justify-content:space-between;
+       background:#fff;border:1px solid var(--line);border-radius:10px;
+       padding:12px;margin-bottom:8px;cursor:pointer}
+  .area-list .item .name{font-weight:600}
+  .area-list .item .cnt{color:var(--muted);font-size:.85rem;margin-left:8px}
+  .row{display:flex;gap:8px;margin-top:10px}
+  .row input{flex:1}
+  .entry-item{background:#fff;border:1px solid var(--line);border-radius:10px;
+       padding:10px 12px;margin-bottom:8px}
+  .entry-item .title{font-weight:600}
+  .entry-item .att{color:var(--muted);font-size:.8rem;margin-top:2px}
+  .entry-actions{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+  .draw-box{background:#fff;border:2px dashed var(--gold);border-radius:12px;
+       padding:22px;text-align:center;min-height:110px;display:flex;
+       flex-direction:column;justify-content:center}
+  .draw-box .big{font-size:1.3rem;font-weight:700;margin-bottom:4px}
+  .draw-box .sub{color:var(--muted);font-size:.85rem}
+  .muted{color:var(--muted);font-size:.85rem}
+  .warnbar{display:none;background:#c0392b;color:#fff;padding:10px 14px;
+       font-size:.9rem;text-align:center}
+  .warnbar.show{display:block}
+  dialog{border:none;border-radius:14px;max-width:560px;width:92%;padding:20px;
+       background:var(--panel)}
+  dialog::backdrop{background:rgba(0,0,0,.45)}
+  dialog h2{margin-top:0}
+  .atts .attachment{background:#f6eee7;border-radius:8px;padding:8px 10px;
+       margin-top:6px;font-size:.88rem;display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .att-view{color:var(--red);cursor:pointer;font-weight:600;text-decoration:underline}
+  textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;
+       padding:8px;font-family:inherit;font-size:.92rem;background:#fff}
+  #recDot{display:inline-block;width:10px;height:10px;border-radius:50%;
+       background:#c0392b;margin-right:6px;animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.2}}
+  .navbar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);
+       border-top:1px solid var(--line);display:flex;justify-content:center;
+       padding:8px;z-index:5}
+  .navbar .crumb{color:var(--muted);font-size:.85rem;align-self:center;margin-right:auto;margin-left:14px}
+  audio{width:100%;margin-top:6px}
+  img.thumb{max-width:120px;max-height:90px;border-radius:8px;display:block;margin-top:6px}
+</style>
+</head>
+<body>
+<div id="warnbar" class="warnbar">⚠️ Speichern fehlgeschlagen — Daten können verloren gehen! (Speicher voll oder Privatmodus?) Bitte Export erstellen.</div>
+<header>
+  <h1>What-To-Do</h1>
+  <div>
+    <button class="hbtn" id="btnBackup">Sicherung</button>
+    <button class="hbtn" id="btnHelp">Hilfe</button>
+  </div>
+</header>
+
+<main>
+  <!-- ANSICHT: Gebiete -->
+  <section id="viewAreas">
+    <div class="card">
+      <h2>Themengebiete</h2>
+      <div class="row">
+        <input type="text" id="newArea" placeholder="Neues Gebiet, z. B. Essen …" maxlength="40">
+        <button class="btn" id="addArea">Anlegen</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="area-list" id="areaList"></div>
+    </div>
+  </section>
+
+  <!-- ANSICHT: Einträge eines Gebiets -->
+  <section id="viewEntries" style="display:none">
+    <div class="card">
+      <h2 id="entriesTitle">Gebiet</h2>
+      <div class="draw-box" id="drawBox">
+        <div class="muted">Bereit für einen Vorschlag?</div>
+      </div>
+      <div class="row">
+        <button class="btn red" id="btnDraw" style="flex:1">🎲 Vorschlag ziehen</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Einträge</h2>
+      <div class="row">
+        <input type="text" id="newEntry" placeholder="Neuer Eintrag …" maxlength="60">
+        <button class="btn" id="addEntry">Hinzufügen</button>
+      </div>
+      <div id="entryList" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- ANSICHT: Eintrag bearbeiten -->
+  <section id="viewDetail" style="display:none">
+    <div class="card">
+      <h2 id="detailTitle">Eintrag</h2>
+      <div class="row">
+        <input type="text" id="editTitle" maxlength="60">
+        <button class="btn small" id="saveTitle">Umbenennen</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Anhänge</h2>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="btn small" id="attText">📝 Text</button>
+        <button class="btn small" id="attImage">🖼️ Bild</button>
+        <button class="btn small" id="attFile">📄 Datei</button>
+        <button class="btn small" id="attAudioUp">🎧 Audio hochladen</button>
+        <button class="btn small" id="attRec">🎙️ Aufnahme</button>
+      </div>
+      <div id="recPanel" style="display:none;margin-top:10px">
+        <span id="recDot"></span><span id="recTime">0:00</span>
+        <div class="row">
+          <button class="btn red small" id="recStop">Aufnahme beenden</button>
+          <button class="btn ghost small" id="recCancel">Verwerfen</button>
+        </div>
+      </div>
+      <div id="textAttPanel" style="display:none;margin-top:10px">
+        <textarea id="textAttArea" placeholder="Rezept / Anleitung hier eingeben …"></textarea>
+        <div class="row"><button class="btn small" id="textAttSave">Speichern</button>
+        <button class="btn ghost small" id="textAttCancel">Abbrechen</button></div>
+      </div>
+      <div class="atts" id="attList"></div>
+    </div>
+  </section>
+</main>
+
+<div class="navbar">
+  <span class="crumb" id="crumb">Themengebiete</span>
+  <button class="btn ghost small" id="btnBack" style="display:none">← Zurück</button>
+</div>
+
+<dialog id="helpDlg">
+  <h2>Hilfe — What-To-Do v1.1</h2>
+  <p><b>Themengebiete</b> sind Sammlungen, z. B. „Essen" oder „Abendbeschäftigung".
+  Lege oben ein Gebiet an und tippe es an, um Einträge hinzuzufügen.</p>
+  <p><b>Vorschlag ziehen:</b> Der 🎲-Button wählt per reinem Zufall einen Eintrag aus.
+  Gefällt er nicht: einfach noch einmal ziehen. Jeder Eintrag ist gleich wahrscheinlich.</p>
+  <p><b>Anhänge:</b> Jeder Eintrag kann Texte, Bilder, Dateien (kein Video) und Audio
+  (Upload oder direkt eingesprochen) enthalten. Obergrenze: 10 MB pro Anhang.
+  Aufnahmen werden platzsparend als WebM/Opus gespeichert.</p>
+  <p><b>Sicherung &amp; Teilen:</b> Export erstellt eine JSON-Datei mit allen Daten
+  (inkl. aller Anhänge). Beim <b>Import</b> wählst du:</p>
+  <ul>
+    <li><b>Zusammenführen:</b> Inhalte der Datei werden mit den vorhandenen kombiniert —
+    ideal, um Sicherungen von zwei Geräten zu vereinen. Gleiche Gebiete/Einträge (gleicher Name)
+    werden verbunden, doppelte Anhänge bleiben nur einmal.</li>
+    <li><b>Ersetzen:</b> Alle vorhandenen Daten werden durch die Datei ersetzt.</li>
+  </ul>
+  <p class="muted">Alle Daten liegen ausschließlich lokal in diesem Browser (IndexedDB).
+  Löschen der Browserdaten löscht auch sie — regelmäßig exportieren!</p>
+  <p class="muted">What-To-Do v1.1, 13.11.2026</p>
+  <div style="text-align:right"><button class="btn" onclick="document.getElementById('helpDlg').close()">Schließen</button></div>
+</dialog>
+
+<dialog id="backupDlg">
+  <h2>Sicherung &amp; Teilen</h2>
+  <p>Export enthält <b>alle</b> Gebiete, Einträge und Anhänge (Base64-kodiert).</p>
+  <div class="row" style="flex-wrap:wrap">
+    <button class="btn" id="btnExport">⬇️ Exportieren</button>
+    <button class="btn ghost" id="btnImport">⬆️ Importieren</button>
+  </div>
+  <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+  <p class="muted" style="margin-top:10px">Beim Import kannst du wählen:
+  Zusammenführen (Inhalte kombiniern) oder Ersetzen (alte Daten weg).</p>
+  <div style="text-align:right"><button class="btn" onclick="document.getElementById('backupDlg').close()">Schließen</button></div>
+</dialog>
+
+<dialog id="importModeDlg">
+  <h2>Import-Modus wählen</h2>
+  <p>Wie sollen die Inhalte der Datei übernommen werden?</p>
+  <div class="row" style="flex-wrap:wrap">
+    <button class="btn" id="impMerge">🔗 Zusammenführen</button>
+    <button class="btn red" id="impReplace">♻️ Ersetzen</button>
+  </div>
+  <p class="muted" style="margin-top:10px">Zusammenführen: Gebiete/Einträge mit gleichem Namen
+  werden kombiniert, doppelte Anhänge bleiben einmalig. Ersetzen: alle bisherigen Daten werden gelöscht.</p>
+  <div style="text-align:right"><button class="btn ghost" id="impCancel">Abbrechen</button></div>
+</dialog>
+
+<dialog id="viewerDlg">
+  <h2 id="viewerTitle">Anhang</h2>
+  <div id="viewerBody"></div>
+  <div style="text-align:right;margin-top:12px">
+    <button class="btn red small" id="viewerDelete">Anhang löschen</button>
+    <button class="btn" onclick="document.getElementById('viewerDlg').close()">Schließen</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ===================== Konstanten ===================== */
+var DB_NAME="what-to-do-db", STORE="kv", KEY="data";
+var MAX_ATTACH=10*1024*1024; // 10 MB pro Anhang
+
+/* ===================== Speicher (IndexedDB) ===================== */
+var db=null;
+function openDB(cb){
+  var req=indexedDB.open(DB_NAME,1);
+  req.onupgradeneeded=function(e){ e.target.result.createObjectStore(STORE); };
+  req.onsuccess=function(e){ db=e.target.result; cb(); };
+  req.onerror=function(){ showWarn("Datenbank konnte nicht geöffnet werden."); cb(); };
+}
+function persistState(){
+  if(!db) return;
+  try{
+    var tx=db.transaction(STORE,"readwrite");
+    tx.objectStore(STORE).put(JSON.stringify(state),KEY);
+    hideWarn();
+  }catch(err){ showWarn("Speichern fehlgeschlagen: "+err); }
+}
+function loadState(cb){
+  if(!db){ cb(); return; }
+  try{
+    var tx=db.transaction(STORE,"readonly");
+    var rq=tx.objectStore(STORE).get(KEY);
+    rq.onsuccess=function(){ cb(rq.result); };
+    rq.onerror=function(){ cb(null); };
+  }catch(err){ showWarn("Laden fehlgeschlagen: "+err); cb(null); }
+}
+
+/* ===================== Datenmodell =====================
+   state = {
+     areas: [ { id, name,
+                entries: [ { id, name,
+                    attachments: [ {id,type:"text"|"blob",mime,name,text?,data?} ] } ] } ]
+   } */
+var state={areas:[]};
+var currentAreaId=null, currentEntryId=null;
+var lastParsedImport=null;
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function curArea(){ for(var i=0;i<state.areas.length;i++) if(state.areas[i].id===currentAreaId) return state.areas[i]; return null; }
+function curEntry(){ var a=curArea(); if(!a) return null;
+  for(var j=0;j<a.entries.length;j++) if(a.entries[j].id===currentEntryId) return a.entries[j]; return null; }
+function save(){ persistState(); }
+
+/* ===================== Warnbanner ===================== */
+function showWarn(msg){ var w=document.getElementById("warnbar"); w.textContent="⚠️ "+msg; w.classList.add("show"); }
+function hideWarn(){ document.getElementById("warnbar").classList.remove("show"); }
+
+/* ===================== Navigation ===================== */
+var views=["viewAreas","viewEntries","viewDetail"];
+function showView(v){
+  views.forEach(function(id){ document.getElementById(id).style.display=(id===v)?"":"none"; });
+  var back=document.getElementById("btnBack");
+  var crumb=document.getElementById("crumb");
+  if(v==="viewAreas"){ back.style.display="none"; crumb.textContent="Themengebiete"; }
+  if(v==="viewEntries"){ back.style.display=""; crumb.textContent=curArea()?curArea().name:""; }
+  if(v==="viewDetail"){ back.style.display=""; crumb.textContent=(curArea()?curArea().name:"")+" › "+(curEntry()?curEntry().name:""); }
+  window.scrollTo(0,0);
+}
+document.getElementById("btnBack").addEventListener("click",function(){
+  if(currentEntryId && document.getElementById("viewDetail").style.display===""){
+    currentEntryId=null; renderEntries(); showView("viewEntries");
+  } else { currentAreaId=null; renderAreas(); showView("viewAreas"); }
+});
+
+/* ===================== Gebiete ===================== */
+function renderAreas(){
+  var el=document.getElementById("areaList"); el.innerHTML="";
+  if(state.areas.length===0){ el.innerHTML='<p class="muted">Noch keine Gebiete. Lege oben eines an, z. B. „Essen“.</p>'; return; }
+  state.areas.forEach(function(a){
+    var d=document.createElement("div"); d.className="item";
+    var left=document.createElement("div");
+    left.innerHTML='<span class="name">'+esc(a.name)+'</span><span class="cnt">('+a.entries.length+' Einträge)</span>';
+    d.appendChild(left);
+    var del=document.createElement("button"); del.className="btn red small"; del.textContent="Löschen";
+    del.addEventListener("click",function(ev){
+      ev.stopPropagation();
+      if(confirm("Gebiet „"+a.name+"“ mit allen Einträgen wirklich löschen?")){
+        state.areas=state.areas.filter(function(x){return x.id!==a.id;}); save(); renderAreas();
+      }
+    });
+    d.appendChild(del);
+    d.addEventListener("click",function(){ currentAreaId=a.id; currentEntryId=null; resetDrawBox(); renderEntries(); showView("viewEntries"); });
+    el.appendChild(d);
+  });
+}
+document.getElementById("addArea").addEventListener("click",addArea);
+document.getElementById("newArea").addEventListener("keydown",function(e){ if(e.key==="Enter") addArea(); });
+function addArea(){
+  var inp=document.getElementById("newArea"), n=inp.value.trim();
+  if(!n){ return; }
+  state.areas.push({id:uid(),name:n,entries:[]});
+  inp.value=""; save(); renderAreas();
+}
+
+/* ===================== Einträge ===================== */
+function resetDrawBox(){
+  document.getElementById("drawBox").innerHTML='<div class="muted">Bereit für einen Vorschlag?</div>';
+}
+function renderEntries(){
+  var a=curArea(); if(!a) return;
+  document.getElementById("entriesTitle").textContent=a.name;
+  var el=document.getElementById("entryList"); el.innerHTML="";
+  if(a.entries.length===0){ el.innerHTML='<p class="muted">Noch keine Einträge.</p>'; return; }
+  a.entries.forEach(function(e){
+    var d=document.createElement("div"); d.className="entry-item";
+    var attCount=e.attachments.length;
+    d.innerHTML='<div class="title">'+esc(e.name)+'</div>'+
+      '<div class="att">'+(attCount?attCount+" Anhang/Anhänge":"keine Anhänge")+'</div>';
+    var act=document.createElement("div"); act.className="entry-actions";
+    var edit=document.createElement("button"); edit.className="btn small"; edit.textContent="Bearbeiten";
+    edit.addEventListener("click",function(){ currentEntryId=e.id; renderDetail(); showView("viewDetail"); });
+    var del=document.createElement("button"); del.className="btn red small"; del.textContent="Löschen";
+    del.addEventListener("click",function(){
+      if(confirm("Eintrag „"+e.name+"“ löschen?")){
+        a.entries=a.entries.filter(function(x){return x.id!==e.id;}); save(); renderEntries();
+      }
+    });
+    act.appendChild(edit); act.appendChild(del); d.appendChild(act);
+    el.appendChild(d);
+  });
+}
+document.getElementById("addEntry").addEventListener("click",addEntry);
+document.getElementById("newEntry").addEventListener("keydown",function(e){ if(e.key==="Enter") addEntry(); });
+function addEntry(){
+  var a=curArea(); if(!a) return;
+  var inp=document.getElementById("newEntry"), n=inp.value.trim();
+  if(!n) return;
+  a.entries.push({id:uid(),name:n,attachments:[]});
+  inp.value=""; save(); renderEntries();
+}
+
+/* ===================== Zufall ===================== */
+document.getElementById("btnDraw").addEventListener("click",draw);
+function draw(){
+  var a=curArea(); if(!a) return;
+  if(a.entries.length===0){
+    document.getElementById("drawBox").innerHTML='<div class="muted">Erst Einträge anlegen, dann ziehen 🙂</div>';
+    return;
+  }
+  var pick=a.entries[Math.floor(Math.random()*a.entries.length)];
+  var box=document.getElementById("drawBox");
+  box.innerHTML='<div class="big">'+esc(pick.name)+'</div>'+
+    '<div class="sub">'+(pick.attachments.length?pick.attachments.length+" Anhang/Anhänge — im Eintrag ansehen":"")+'</div>';
+  if(pick.attachments.length){
+    var see=document.createElement("button"); see.className="btn ghost small"; see.textContent="Anhänge ansehen";
+    see.style.marginTop="8px";
+    see.addEventListener("click",function(){ currentEntryId=pick.id; renderDetail(); showView("viewDetail"); });
+    box.appendChild(see);
+  }
+}
+
+/* ===================== Detail / Anhänge ===================== */
+function renderDetail(){
+  var e=curEntry(); if(!e) return;
+  document.getElementById("detailTitle").textContent=e.name;
+  document.getElementById("editTitle").value=e.name;
+  var el=document.getElementById("attList"); el.innerHTML="";
+  if(e.attachments.length===0){ el.innerHTML='<p class="muted">Noch keine Anhänge.</p>'; }
+  e.attachments.forEach(function(att){
+    var d=document.createElement("div"); d.className="attachment";
+    var info=document.createElement("span");
+    var icon=att.mime&&att.mime.indexOf("audio")===0?"🎧":(att.mime&&att.mime.indexOf("image")===0?"🖼️":(att.type==="text"?"📝":"📄"));
+    info.innerHTML=icon+" "+esc(att.name||"Anhang");
+    d.appendChild(info);
+    var right=document.createElement("span");
+    var view=document.createElement("span"); view.className="att-view"; view.textContent="Ansehen";
+    view.addEventListener("click",function(){ openViewer(att.id); });
+    right.appendChild(view);
+    d.appendChild(right);
+    if(att.type==="blob"&&att.mime&&att.mime.indexOf("image")===0&&att.data){
+      var img=document.createElement("img"); img.className="thumb"; img.src=att.data; d.appendChild(img);
+    }
+    el.appendChild(d);
+  });
+}
+document.getElementById("saveTitle").addEventListener("click",function(){
+  var e=curEntry(); if(!e) return;
+  var v=document.getElementById("editTitle").value.trim();
+  if(v){ e.name=v; save(); renderDetail(); }
+});
+var currentViewerAttId=null;
+function openViewer(attId){
+  var e=curEntry(); if(!e) return;
+  var att=null; e.attachments.forEach(function(a){ if(a.id===attId) att=a; });
+  if(!att) return;
+  currentViewerAttId=attId;
+  document.getElementById("viewerTitle").textContent=att.name||"Anhang";
+  var body=document.getElementById("viewerBody"); body.innerHTML="";
+  if(att.type==="text"){
+    var pre=document.createElement("div");
+    pre.style.whiteSpace="pre-wrap"; pre.style.background="#fff";
+    pre.style.padding="10px"; pre.style.borderRadius="8px";
+    pre.textContent=att.text||""; body.appendChild(pre);
+  } else if(att.mime&&att.mime.indexOf("image")===0){
+    var img=document.createElement("img"); img.style.maxWidth="100%"; img.src=att.data; body.appendChild(img);
+  } else if(att.mime&&att.mime.indexOf("audio")===0){
+    var au=document.createElement("audio"); au.controls=true; au.src=att.data; body.appendChild(au);
+  } else {
+    var p=document.createElement("p");
+    p.innerHTML='Vorschau nicht möglich ('+esc(att.mime||"unbekannt")+'). <a download="'+esc(att.name)+'" href="'+att.data+'">Datei herunterladen</a>';
+    body.appendChild(p);
+  }
+  document.getElementById("viewerDlg").showModal();
+}
+document.getElementById("viewerDelete").addEventListener("click",function(){
+  var e=curEntry(); if(!e||!currentViewerAttId) return;
+  if(!confirm("Diesen Anhang löschen?")) return;
+  e.attachments=e.attachments.filter(function(a){return a.id!==currentViewerAttId;});
+  save(); document.getElementById("viewerDlg").close(); renderDetail();
+});
+
+/* ---- Text-Anhang ---- */
+document.getElementById("attText").addEventListener("click",function(){
+  document.getElementById("textAttArea").value="";
+  document.getElementById("textAttPanel").style.display="";
+});
+document.getElementById("textAttCancel").addEventListener("click",function(){
+  document.getElementById("textAttPanel").style.display="none";
+});
+document.getElementById("textAttSave").addEventListener("click",function(){
+  var e=curEntry(); if(!e) return;
+  var t=document.getElementById("textAttArea").value;
+  if(!t.trim()){ alert("Text ist leer."); return; }
+  e.attachments.push({id:uid(),type:"text",name:"Notiz",text:t});
+  save(); document.getElementById("textAttPanel").style.display="none"; renderDetail();
+});
+
+/* ---- Datei/Bild-Anhang (gemeinsame Prüfung) ---- */
+document.getElementById("attImage").addEventListener("click",function(){ pickFile("image/*"); });
+document.getElementById("attFile").addEventListener("click",function(){ pickFile(""); });
+function pickFile(accept){
+  var inp=document.createElement("input");
+  inp.type="file"; if(accept) inp.accept=accept;
+  inp.onchange=function(){
+    var f=inp.files[0]; if(!f) return;
+    if(f.type&&f.type.indexOf("video")===0){ alert("Videos werden nicht unterstützt."); return; }
+    if(f.size>MAX_ATTACH){ alert("Datei ist "+fmtMB(f.size)+" MB — zu groß. Maximum: 10 MB pro Anhang."); return; }
+    var r=new FileReader();
+    r.onload=function(){ addBlobAtt(f.name,f.type,r.result); };
+    r.readAsDataURL(f);
+  };
+  inp.click();
+}
+function addBlobAtt(name,mime,dataUrl){
+  var e=curEntry(); if(!e) return;
+  e.attachments.push({id:uid(),type:"blob",mime:mime,name:name,data:dataUrl});
+  save(); renderDetail();
+}
+function fmtMB(n){ return (n/1048576).toFixed(1); }
+
+/* ---- Audio-Upload ---- */
+document.getElementById("attAudioUp").addEventListener("click",function(){
+  var inp=document.createElement("input");
+  inp.type="file"; inp.accept="audio/*";
+  inp.onchange=function(){
+    var f=inp.files[0]; if(!f) return;
+    if(f.size>MAX_ATTACH){ alert("Audiodatei ist "+fmtMB(f.size)+" MB — zu groß. Maximum: 10 MB."); return; }
+    var r=new FileReader();
+    r.onload=function(){ addBlobAtt(f.name,f.type||"audio/mpeg",r.result); };
+    r.readAsDataURL(f);
+  };
+  inp.click();
+});
+
+/* ---- Audio-Aufnahme (MediaRecorder, WebM/Opus) ---- */
+var mediaRecorder=null, chunks=[], recStart=0, recTimer=null, recStream=null;
+document.getElementById("attRec").addEventListener("click",startRec);
+function startRec(){
+  if(!navigator.mediaDevices||!window.MediaRecorder){
+    alert("Aufnahme wird von diesem Browser nicht unterstützt. Bitte Audio-Upload nutzen.");
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    recStream=stream; chunks=[];
+    mediaRecorder=new MediaRecorder(stream);
+    mediaRecorder.ondataavailable=function(ev){ if(ev.data&&ev.data.size){ chunks.push(ev.data); } };
+    mediaRecorder.onstop=onRecStop;
+    mediaRecorder.start();
+    recStart=Date.now();
+    document.getElementById("recPanel").style.display="";
+    recTimer=setInterval(function(){
+      var s=Math.floor((Date.now()-recStart)/1000);
+      document.getElementById("recTime").textContent=Math.floor(s/60)+":"+("0"+(s%60)).slice(-2);
+    },250);
+  }).catch(function(){ alert("Mikrofonzugriff wurde verweigert."); });
+}
+function onRecStop(){
+  var blob=new Blob(chunks,{type:mediaRecorder.mimeType||"audio/webm"});
+  if(recStream){ recStream.getTracks().forEach(function(t){t.stop();}); recStream=null; }
+  clearInterval(recTimer);
+  document.getElementById("recPanel").style.display="none";
+  if(blob.size>MAX_ATTACH){
+    alert("Aufnahme zu groß ("+fmtMB(blob.size)+" MB). Maximum: 10 MB — bitte kürzer aufnehmen.");
+    return;
+  }
+  var name="Aufnahme "+new Date().toLocaleString("de-DE")+".webm";
+  var r=new FileReader();
+  r.onload=function(){ addBlobAtt(name,blob.type,r.result); };
+  r.readAsDataURL(blob);
+}
+document.getElementById("recStop").addEventListener("click",function(){ if(mediaRecorder&&mediaRecorder.state!=="inactive") mediaRecorder.stop(); });
+document.getElementById("recCancel").addEventListener("click",function(){
+  if(mediaRecorder&&mediaRecorder.state!=="inactive"){
+    mediaRecorder.onstop=function(){
+      if(recStream){ recStream.getTracks().forEach(function(t){t.stop();}); recStream=null; }
+      clearInterval(recTimer); document.getElementById("recPanel").style.display="none";
+    };
+    mediaRecorder.stop();
+  } else { clearInterval(recTimer); document.getElementById("recPanel").style.display="none"; }
+});
+
+/* ===================== Export / Import ===================== */
+document.getElementById("btnBackup").addEventListener("click",function(){ document.getElementById("backupDlg").showModal(); });
+document.getElementById("btnExport").addEventListener("click",function(){
+  var payload={app:"what-to-do",version:1,exported:new Date().toISOString(),data:state};
+  var blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url; a.download="what-to-do-export-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); },2000);
+});
+document.getElementById("btnImport").addEventListener("click",function(){ document.getElementById("importFile").click(); });
+document.getElementById("importFile").addEventListener("change",function(ev){
+  var f=ev.target.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var parsed=JSON.parse(r.result);
+      if(!parsed||parsed.app!=="what-to-do"||!parsed.data) throw new Error("keine What-To-Do-Datei");
+      if(!parsed.data.areas) throw new Error("ungültige Dateistruktur");
+      lastParsedImport=parsed.data;
+      document.getElementById("backupDlg").close();
+      document.getElementById("importModeDlg").showModal();
+    }catch(err){ alert("Import fehlgeschlagen: "+err.message); }
+  };
+  r.readAsText(f);
+  ev.target.value="";
+});
+document.getElementById("impCancel").addEventListener("click",function(){
+  lastParsedImport=null;
+  document.getElementById("importModeDlg").close();
+});
+document.getElementById("impReplace").addEventListener("click",function(){
+  if(!lastParsedImport) return;
+  if(!confirm("Ersetzen löscht ALLE vorhandenen Daten. Wirklich fortfahren?")){
+    return;
+  }
+  state=lastParsedImport;
+  afterImport("Ersetzen abgeschlossen.");
+});
+document.getElementById("impMerge").addEventListener("click",function(){
+  if(!lastParsedImport) return;
+  var stats=mergeIntoState(lastParsedImport);
+  afterImport("Zusammengeführt: "+stats.areas+" Gebiet/Gebiete, "+
+              stats.entries+" Eintrag/Einträge und "+stats.attaches+
+              " Anhang/Anhänge neu hinzugefügt.");
+});
+function afterImport(msg){
+  lastParsedImport=null;
+  currentAreaId=null; currentEntryId=null;
+  save(); renderAreas(); showView("viewAreas");
+  document.getElementById("importModeDlg").close();
+  alert(msg);
+}
+
+/* --- Zusammenführen: Gebiete/Einträge per Name (Groß/Klein egal),
+       Anhänge als Duplikate nach Name + Inhalt erkennen --- */
+function normName(s){ return String(s||"").trim().toLowerCase(); }
+function mergeIntoState(imp){
+  var stats={areas:0,entries:0,attaches:0};
+  (imp.areas||[]).forEach(function(impArea){
+    var target=null;
+    for(var i=0;i<state.areas.length;i++){
+      if(normName(state.areas[i].name)===normName(impArea.name)){ target=state.areas[i]; break; }
+    }
+    if(!target){
+      target={id:uid(),name:String(impArea.name||"Unbenannt"),entries:[]};
+      state.areas.push(target); stats.areas++;
+    }
+    (impArea.entries||[]).forEach(function(impEntry){
+      var te=null;
+      for(var j=0;j<target.entries.length;j++){
+        if(normName(target.entries[j].name)===normName(impEntry.name)){ te=target.entries[j]; break; }
+      }
+      if(!te){
+        te={id:uid(),name:String(impEntry.name||"Unbenannt"),
+            attachments:(impEntry.attachments||[]).map(function(a){ return deepCopyAtt(a); })};
+        target.entries.push(te);
+        stats.entries++; stats.attaches+=te.attachments.length;
+        return;
+      }
+      (impEntry.attachments||[]).forEach(function(impAtt){
+        if(attachmentExists(te.attachments,impAtt)) return;
+        te.attachments.push(deepCopyAtt(impAtt)); stats.attaches++;
+      });
+    });
+  });
+  return stats;
+}
+function attKey(att){
+  if(!att) return "";
+  if(att.type==="text") return "t|"+normName(att.name)+"|"+String(att.text||"").trim();
+  return "b|"+normName(att.name)+"|"+String(att.mime||"")+"|"+String(att.data||"").length+"|"+
+         (String(att.data||"").slice(-200));
+}
+function attachmentExists(list,att){
+  var k=attKey(att);
+  for(var i=0;i<list.length;i++){ if(attKey(list[i])===k) return true; }
+  return false;
+}
+function deepCopyAtt(att){
+  var c={id:uid(),type:att.type,name:att.name,mime:att.mime};
+  if(att.type==="text") c.text=att.text; else c.data=att.data;
+  return c;
+}
+
+/* ===================== Hilfe ===================== */
+document.getElementById("btnHelp").addEventListener("click",function(){ document.getElementById("helpDlg").showModal(); });
+
+/* ===================== Notfallspeichern ===================== */
+window.addEventListener("pagehide",persistState);
+window.addEventListener("beforeunload",persistState);
+document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="hidden") persistState(); });
+
+/* ===================== Utils ===================== */
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ===================== Start ===================== */
+openDB(function(){
+  loadState(function(raw){
+    if(raw){ try{ state=JSON.parse(raw); }catch(e){ state={areas:[]}; } }
+    renderAreas(); showView("viewAreas");
+  });
+});
+</script>
+</body>
+</html>
