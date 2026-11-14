@@ -1,44 +1,39 @@
 <!DOCTYPE html>
 <!--
   ============================================================
-  What-To-Do  —  Version 1.2 (14.11.2026)
+  What-To-Do  —  Version 1.4 (14.11.2026)
   ============================================================
   Ideen- und Vorschlags-Tool: Themengebiete anlegen
   (z.B. "Essen", "Abendbeschäftigung"), Einträge erfassen,
   per Zufall einen Vorschlag ziehen. Zu jedem Eintrag können
-  Anhänge hinterlegt werden: Text, Bild, Datei (kein Video),
-  Audio (Upload oder Mikrofonaufnahme, WebM/Opus).
+  Anhänge hinterlegt werden: Text, Bild, Datei, Audio
+  (Upload oder Mikrofonaufnahme, WebM/Opus) und Video (Upload).
   Max. 10 MB pro Anhang.
 
   VERSIONSHISTORIE
   ----------------
+  v1.4 (14.11.2026)
+    - Text-Anhänge sind jetzt NACHTRÄGLICH EDITIERBAR:
+      In der Anhangsansicht erscheint für Texte ein
+      Bearbeiten-Modus (Ändern oder löschen wie bisher)
+    - Hardware-/System-Zurück-Button des Smartphones (Android
+      Zurück, Browser-Zurück) funktioniert jetzt wie der
+      Zurück-Button in der App: Die Ansichten werden in den
+      Browser-Verlauf eingetragen (History-API); Dialoge
+      schließen sich ebenfalls per System-Zurück
+  v1.3 (14.11.2026)
+    - Farbschema-Standard = "wie System/Browser"
+    - Videos als Anhang erlaubt (Upload, max. 10 MB)
+    - Audio-Upload mobil repariert (kein accept-Filter mehr)
   v1.2 (14.11.2026)
-    - Dark Mode übernommen aus Still-Tracker v21 (uniform):
-      * 3 Modi: Manuell (Standard), Zeitfenster (Standard
-        20:00-07:00, über Mitternacht möglich), OS/System folgen
-      * Schnellumschalter (Mond/Sonne) im Kopf, in jedem Modus
-        wirksam: schaltet sofort um und stellt auf "manuell"
-      * Sanfter Farbwechsel per Transition (.45s ease)
-      * Dynamische Meta-Theme-Farbe; alle Elemente folgen dem
-        Theme (inkl. Dialoge, Warnleiste, Ziehungsbox)
-      * Theme-Einstellung wird gespeichert und im Backup
-        mitgeführt; Import/Export erhält sie
-    - Helfer-Text (Hilfe-Dialog) um Farbschema-Kapitel ergänzt
+    - Dark Mode aus Still-Tracker v21 (3 Modi, Schnell-
+      umschalter, Transition, Persistenz+Backup)
   v1.1 (13.11.2026)
-    - "Nochmal ziehen" entfernt (gleiche Funktion wie
-      "Vorschlag ziehen")
-    - Import kann ZUSAMMENFÜHREN statt nur ersetzen:
-      Gebiete und Einträge werden anhand des Namens abgeglichen,
-      Anhänge werden kombiniert (Duplikate nach Name+Inhalt
-      bleiben einmalig). "Ersetzen" weiterhin verfügbar.
+    - "Nochmal ziehen" entfernt; Import: Zusammenführen oder
+      Ersetzen (Namensabgleich, Duplikat-Erkennung)
   v1.0 (13.11.2026)
-    - Erste Version
-    - 3 Ebenen: Themengebiete -> Einträge -> Zufallsziehung
-    - Anhänge: Text / Bild / Datei / Audio (Upload + Aufnahme)
-    - Speicherung in IndexedDB ("what-to-do-db", Store "kv")
-    - Sofortspeichern; JSON-Export/Import; Hilfe-Dialog;
-      rote Warnung bei Speicherproblemen
-    - Design angelehnt an Still-Tracker v20
+    - Erste Version: 3 Ebenen, Anhänge, IndexedDB
+      ("what-to-do-db"), Sofortspeichern, Export/Import
   ============================================================
 -->
 <html lang="de">
@@ -70,9 +65,8 @@
   body{margin:0;background:var(--bg);color:var(--ink);
        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
        padding-bottom:90px}
-  /* v1.2: sanfter Theme-Übergang statt abruptem Umsprung */
   body, header, .card, button, input, dialog, textarea, .item,
-  .entry-item, .draw-box, .attachment, .warnbar, dialog::backdrop, audio {
+  .entry-item, .draw-box, .attachment, .warnbar, dialog::backdrop, audio, video {
     transition: background-color .45s ease, border-color .45s ease,
                 color .45s ease, box-shadow .45s ease;
   }
@@ -81,7 +75,6 @@
   header h1{margin:0;font-size:1.15rem;font-weight:600}
   .hbtn{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;
         padding:7px 11px;font-size:.85rem;cursor:pointer;margin-left:6px}
-  /* v1.2: Schnellumschalter hell/dunkel */
   .theme-quick{
     background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;
     min-width:44px;min-height:38px;padding:0 10px;font-size:1.05rem;
@@ -137,8 +130,8 @@
        padding:8px;z-index:5}
   .navbar .crumb{color:var(--muted);font-size:.85rem;align-self:center;margin-right:auto;margin-left:14px}
   audio{width:100%;margin-top:6px}
+  video{max-width:100%;max-height:320px;border-radius:8px;display:block;margin-top:6px}
   img.thumb{max-width:120px;max-height:90px;border-radius:8px;display:block;margin-top:6px}
-  /* v1.2: Theme-Einstellungen */
   .setting-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .setting-row + .setting-row{margin-top:10px}
   .setting-row p{margin:0;font-size:.92rem}
@@ -161,7 +154,6 @@
 </header>
 
 <main>
-  <!-- ANSICHT: Gebiete -->
   <section id="viewAreas">
     <div class="card">
       <h2>Themengebiete</h2>
@@ -175,7 +167,6 @@
     </div>
   </section>
 
-  <!-- ANSICHT: Einträge eines Gebiets -->
   <section id="viewEntries" style="display:none">
     <div class="card">
       <h2 id="entriesTitle">Gebiet</h2>
@@ -196,7 +187,6 @@
     </div>
   </section>
 
-  <!-- ANSICHT: Eintrag bearbeiten -->
   <section id="viewDetail" style="display:none">
     <div class="card">
       <h2 id="detailTitle">Eintrag</h2>
@@ -210,6 +200,7 @@
       <div class="row" style="flex-wrap:wrap">
         <button class="btn small" id="attText">📝 Text</button>
         <button class="btn small" id="attImage">🖼️ Bild</button>
+        <button class="btn small" id="attVideo">🎬 Video</button>
         <button class="btn small" id="attFile">📄 Datei</button>
         <button class="btn small" id="attAudioUp">🎧 Audio hochladen</button>
         <button class="btn small" id="attRec">🎙️ Aufnahme</button>
@@ -227,10 +218,11 @@
         <button class="btn ghost small" id="textAttCancel">Abbrechen</button></div>
       </div>
       <div class="atts" id="attList"></div>
+      <p class="muted" style="margin-top:8px">Maximalgröße pro Anhang: 10 MB
+      (Bilder, Audio, Video, Dateien). Größere Dateien werden abgelehnt.</p>
     </div>
   </section>
 
-  <!-- v1.2: Einstellungen (Farbschema) -->
   <section id="viewSettings" style="display:none">
     <div class="card">
       <h2>Farbschema</h2>
@@ -249,8 +241,9 @@
           <input type="time" id="themeEnd" value="07:00">
         </span>
       </div>
-      <p class="muted" style="margin-top:10px">Der Mond/Sonne-Button oben rechts wirkt in jedem
-      Modus: ein Tipp schaltet sofort um und stellt zugleich auf „manuell" um.</p>
+      <p class="muted" style="margin-top:10px">Standard ist „wie System/Browser".
+      Der Mond/Sonne-Button oben rechts wirkt in jedem Modus: ein Tipp schaltet
+      sofort um und stellt zugleich auf „manuell" um.</p>
     </div>
   </section>
 </main>
@@ -262,14 +255,18 @@
 </div>
 
 <dialog id="helpDlg">
-  <h2>Hilfe — What-To-Do v1.2</h2>
+  <h2>Hilfe — What-To-Do v1.4</h2>
   <p><b>Themengebiete</b> sind Sammlungen, z. B. „Essen" oder „Abendbeschäftigung".
   Lege oben ein Gebiet an und tippe es an, um Einträge hinzuzufügen.</p>
   <p><b>Vorschlag ziehen:</b> Der 🎲-Button wählt per reinem Zufall einen Eintrag aus.
   Gefällt er nicht: einfach noch einmal ziehen. Jeder Eintrag ist gleich wahrscheinlich.</p>
-  <p><b>Anhänge:</b> Jeder Eintrag kann Texte, Bilder, Dateien (kein Video) und Audio
-  (Upload oder direkt eingesprochen) enthalten. Obergrenze: 10 MB pro Anhang.
+  <p><b>Anhänge:</b> Jeder Eintrag kann Texte, Bilder, Videos, Dateien und Audio
+  (Upload oder direkt eingesprochen) enthalten. Obergrenze: <b>10 MB pro Anhang</b>.
+  <b>Texte können nachträglich bearbeitet werden</b> (in der Anhangsansicht).
   Aufnahmen werden platzsparend als WebM/Opus gespeichert.</p>
+  <p><b>Zurück-Navigation:</b> Der Zurück-Button der App und der System-Zurück-Button
+  deines Geräts (bzw. des Browsers) tun dasselbe: Sie führen eine Ansicht zurück.
+  Offene Dialoge werden ebenfalls geschlossen.</p>
   <p><b>Sicherung &amp; Teilen:</b> Export erstellt eine JSON-Datei mit allen Daten
   (inkl. aller Anhänge und der Farbschema-Einstellung). Beim <b>Import</b> wählst du:</p>
   <ul>
@@ -280,17 +277,16 @@
   </ul>
   <h4 style="margin-bottom:4px">Farbschema (hell/dunkel)</h4>
   <ul>
-    <li><b>Manuell:</b> Umschalten über den Mond/Sonne-Button oben rechts oder unter Einstellungen. Das ist der Standard.</li>
+    <li><b>Wie System/Browser:</b> Standard. Folgt der Hell/Dunkel-Einstellung deines Geräts.</li>
+    <li><b>Manuell:</b> Umschalten über den Mond/Sonne-Button oben rechts oder unter Einstellungen.</li>
     <li><b>Zeitfenster:</b> Dunkel automatisch in einem Zeitraum (z. B. 20:00–07:00, auch über Mitternacht möglich), sonst hell.</li>
-    <li><b>Wie System/Browser:</b> Folgt der Hell/Dunkel-Einstellung deines Geräts.</li>
     <li>Der Mond/Sonne-Button wirkt in jedem Modus: ein Tipp schaltet sofort um und stellt gleichzeitig auf „manuell" um.</li>
-    <li>Der Wechsel erfolgt weich überblendet statt abrupt.</li>
   </ul>
   <p class="muted">Alle Daten liegen ausschließlich lokal in diesem Browser (IndexedDB).
   Löschen der Browserdaten löscht auch sie — regelmäßig exportieren! Beachte: Lokal geöffnete
   Dateien (Doppelklick) haben je nach Browser einen eigenen Speicher pro Datei; am stabilen
   Speicher erreichst du die App am besten immer über denselben Weg (z. B. GitHub Pages).</p>
-  <p class="muted">What-To-Do v1.2, 14.11.2026</p>
+  <p class="muted">What-To-Do v1.4, 14.11.2026</p>
   <div style="text-align:right"><button class="btn" onclick="document.getElementById('helpDlg').close()">Schließen</button></div>
 </dialog>
 
@@ -322,7 +318,13 @@
 <dialog id="viewerDlg">
   <h2 id="viewerTitle">Anhang</h2>
   <div id="viewerBody"></div>
+  <div id="textEditPanel" style="display:none;margin-top:10px">
+    <textarea id="textEditArea"></textarea>
+    <div class="row"><button class="btn small" id="textEditSave">Änderungen speichern</button>
+    <button class="btn ghost small" id="textEditCancel">Verwerfen</button></div>
+  </div>
   <div style="text-align:right;margin-top:12px">
+    <button class="btn small" id="viewerEdit" style="display:none">✏️ Bearbeiten</button>
     <button class="btn red small" id="viewerDelete">Anhang löschen</button>
     <button class="btn" onclick="document.getElementById('viewerDlg').close()">Schließen</button>
   </div>
@@ -333,6 +335,7 @@
 /* ===================== Konstanten ===================== */
 var DB_NAME="what-to-do-db", STORE="kv", KEY="data";
 var MAX_ATTACH=10*1024*1024; // 10 MB pro Anhang
+var DEFAULT_THEME={mode:"os",dark:false,start:"20:00",end:"07:00"};
 
 /* ===================== Speicher (IndexedDB) ===================== */
 var db=null;
@@ -360,14 +363,8 @@ function loadState(cb){
   }catch(err){ showWarn("Laden fehlgeschlagen: "+err); cb(null); }
 }
 
-/* ===================== Datenmodell =====================
-   state = {
-     areas: [ { id, name,
-                entries: [ { id, name,
-                    attachments: [ {id,type:"text"|"blob",mime,name,text?,data?} ] } ] } ],
-     theme: { mode:"manual"|"window"|"os", dark:boolean, start:"HH:MM", end:"HH:MM" }
-   } */
-var state={areas:[],theme:{mode:"manual",dark:false,start:"20:00",end:"07:00"}};
+/* ===================== Datenmodell ===================== */
+var state={areas:[],theme:{mode:"os",dark:false,start:"20:00",end:"07:00"}};
 var currentAreaId=null, currentEntryId=null;
 var lastParsedImport=null;
 
@@ -381,12 +378,12 @@ function save(){ persistState(); }
 function showWarn(msg){ var w=document.getElementById("warnbar"); w.textContent="⚠️ "+msg; w.classList.add("show"); }
 function hideWarn(){ document.getElementById("warnbar").classList.remove("show"); }
 
-/* ===================== Theme (v1.2, übernommen aus Still-Tracker v21) ===================== */
+/* ===================== Theme (aus Still-Tracker v21) ===================== */
 var LIGHT_THEME_COLOR="#f6eee7", DARK_THEME_COLOR="#1c1714";
 
 function ensureTheme(){
-  if(!state.theme||typeof state.theme!=="object") state.theme={mode:"manual",dark:false,start:"20:00",end:"07:00"};
-  if(["manual","window","os"].indexOf(state.theme.mode)<0) state.theme.mode="manual";
+  if(!state.theme||typeof state.theme!=="object") state.theme={mode:DEFAULT_THEME.mode,dark:false,start:"20:00",end:"07:00"};
+  if(["manual","window","os"].indexOf(state.theme.mode)<0) state.theme.mode=DEFAULT_THEME.mode;
   if(typeof state.theme.start!=="string"||!/^\d{2}:\d{2}$/.test(state.theme.start)) state.theme.start="20:00";
   if(typeof state.theme.end!=="string"||!/^\d{2}:\d{2}$/.test(state.theme.end)) state.theme.end="07:00";
   state.theme.dark=Boolean(state.theme.dark);
@@ -401,7 +398,6 @@ function inWindow(now){
   var cur=now.getHours()*60+now.getMinutes();
   var s=minutesOf(state.theme.start), e=minutesOf(state.theme.end);
   if(s===null||e===null||s===e) return false;
-  // Fenster über Mitternacht (z. B. 20:00–07:00)
   return s<e ? (cur>=s&&cur<e) : (cur>=s||cur<e);
 }
 var osDarkQuery=window.matchMedia?window.matchMedia("(prefers-color-scheme: dark)"):null;
@@ -425,7 +421,6 @@ function setThemeMode(mode){
   applyTheme(); save();
 }
 document.getElementById("themeQuick").addEventListener("click",function(){
-  // Sofort umschalten und auf manuell umstellen (dauerhaftes Übersteuern)
   var dark=document.documentElement.getAttribute("data-theme")==="dark";
   state.theme.mode="manual";
   state.theme.dark=!dark;
@@ -441,7 +436,6 @@ if(osDarkQuery){
   if(osDarkQuery.addEventListener) osDarkQuery.addEventListener("change",osHandler);
   else if(osDarkQuery.addListener) osDarkQuery.addListener(osHandler);
 }
-// v1.2: Zeitfenster- und OS-Modus laufend prüfen (wie Still-Tracker v21)
 setInterval(function(){
   if(state.theme.mode!=="manual"){
     var dark=themeShouldBeDark(new Date());
@@ -449,9 +443,13 @@ setInterval(function(){
   }
 },500);
 
-/* ===================== Navigation ===================== */
+/* ===================== Navigation (v1.4: mit Browser-History) ===================== */
 var views=["viewAreas","viewEntries","viewDetail","viewSettings"];
+var currentView="viewAreas";
+var historyReady=false;
+
 function showView(v){
+  currentView=v;
   views.forEach(function(id){ document.getElementById(id).style.display=(id===v)?"":"none"; });
   var back=document.getElementById("btnBack");
   var crumb=document.getElementById("crumb");
@@ -461,13 +459,32 @@ function showView(v){
   if(v==="viewSettings"){ back.style.display="none"; crumb.textContent="Einstellungen"; }
   window.scrollTo(0,0);
 }
+/* goTo: nutzerinitiierte Navigation -> Eintrag in den Browser-Verlauf */
+function goTo(v){
+  showView(v);
+  if(historyReady){
+    try{ history.pushState({wtd:v},""); }catch(e){}
+  }
+}
+window.addEventListener("popstate",function(ev){
+  // v1.4: System-/Browser-Zurück verhält sich wie der Zurück-Button der App
+  var d=document.querySelector("dialog[open]");
+  if(d){ d.close(); return; }
+  if(ev.state&&ev.state.wtd&&views.indexOf(ev.state.wtd)>=0){
+    showView(ev.state.wtd);
+  } else {
+    showView("viewAreas");
+  }
+});
 document.getElementById("btnBack").addEventListener("click",function(){
-  if(currentEntryId && document.getElementById("viewDetail").style.display===""){
-    currentEntryId=null; renderEntries(); showView("viewEntries");
-  } else { currentAreaId=null; renderAreas(); showView("viewAreas"); }
+  if(historyReady && history.length>1){ history.back(); }
+  else {
+    if(currentEntryId){ currentEntryId=null; renderEntries(); showView("viewEntries"); }
+    else { currentAreaId=null; renderAreas(); showView("viewAreas"); }
+  }
 });
 document.getElementById("btnSettings").addEventListener("click",function(){
-  showView("viewSettings");
+  goTo("viewSettings");
 });
 
 /* ===================== Gebiete ===================== */
@@ -487,7 +504,7 @@ function renderAreas(){
       }
     });
     d.appendChild(del);
-    d.addEventListener("click",function(){ currentAreaId=a.id; currentEntryId=null; resetDrawBox(); renderEntries(); showView("viewEntries"); });
+    d.addEventListener("click",function(){ currentAreaId=a.id; currentEntryId=null; resetDrawBox(); renderEntries(); goTo("viewEntries"); });
     el.appendChild(d);
   });
 }
@@ -516,7 +533,7 @@ function renderEntries(){
       '<div class="att">'+(attCount?attCount+" Anhang/Anhänge":"keine Anhänge")+'</div>';
     var act=document.createElement("div"); act.className="entry-actions";
     var edit=document.createElement("button"); edit.className="btn small"; edit.textContent="Bearbeiten";
-    edit.addEventListener("click",function(){ currentEntryId=e.id; renderDetail(); showView("viewDetail"); });
+    edit.addEventListener("click",function(){ currentEntryId=e.id; renderDetail(); goTo("viewDetail"); });
     var del=document.createElement("button"); del.className="btn red small"; del.textContent="Löschen";
     del.addEventListener("click",function(){
       if(confirm("Eintrag „"+e.name+"“ löschen?")){
@@ -552,12 +569,18 @@ function draw(){
   if(pick.attachments.length){
     var see=document.createElement("button"); see.className="btn ghost small"; see.textContent="Anhänge ansehen";
     see.style.marginTop="8px";
-    see.addEventListener("click",function(){ currentEntryId=pick.id; renderDetail(); showView("viewDetail"); });
+    see.addEventListener("click",function(){ currentEntryId=pick.id; renderDetail(); goTo("viewDetail"); });
     box.appendChild(see);
   }
 }
 
 /* ===================== Detail / Anhänge ===================== */
+function attIcon(att){
+  if(att.mime&&att.mime.indexOf("audio")===0) return "🎧";
+  if(att.mime&&att.mime.indexOf("image")===0) return "🖼️";
+  if(att.mime&&att.mime.indexOf("video")===0) return "🎬";
+  return att.type==="text"?"📝":"📄";
+}
 function renderDetail(){
   var e=curEntry(); if(!e) return;
   document.getElementById("detailTitle").textContent=e.name;
@@ -567,8 +590,7 @@ function renderDetail(){
   e.attachments.forEach(function(att){
     var d=document.createElement("div"); d.className="attachment";
     var info=document.createElement("span");
-    var icon=att.mime&&att.mime.indexOf("audio")===0?"🎧":(att.mime&&att.mime.indexOf("image")===0?"🖼️":(att.type==="text"?"📝":"📄"));
-    info.innerHTML=icon+" "+esc(att.name||"Anhang");
+    info.innerHTML=attIcon(att)+" "+esc(att.name||"Anhang");
     d.appendChild(info);
     var right=document.createElement("span");
     var view=document.createElement("span"); view.className="att-view"; view.textContent="Ansehen";
@@ -594,7 +616,11 @@ function openViewer(attId){
   currentViewerAttId=attId;
   document.getElementById("viewerTitle").textContent=att.name||"Anhang";
   var body=document.getElementById("viewerBody"); body.innerHTML="";
-  if(att.type==="text"){
+  var isText=(att.type==="text");
+  // v1.4: Bearbeiten-Button nur für Textanhänge
+  document.getElementById("viewerEdit").style.display=isText?"":"none";
+  document.getElementById("textEditPanel").style.display="none";
+  if(isText){
     var pre=document.createElement("div");
     pre.style.whiteSpace="pre-wrap"; pre.style.background="var(--surface)";
     pre.style.padding="10px"; pre.style.borderRadius="8px";
@@ -603,21 +629,58 @@ function openViewer(attId){
     var img=document.createElement("img"); img.style.maxWidth="100%"; img.src=att.data; body.appendChild(img);
   } else if(att.mime&&att.mime.indexOf("audio")===0){
     var au=document.createElement("audio"); au.controls=true; au.src=att.data; body.appendChild(au);
+  } else if(att.mime&&att.mime.indexOf("video")===0){
+    var vid=document.createElement("video"); vid.controls=true; vid.src=att.data; body.appendChild(vid);
   } else {
     var p=document.createElement("p");
     p.innerHTML='Vorschau nicht möglich ('+esc(att.mime||"unbekannt")+'). <a download="'+esc(att.name)+'" href="'+att.data+'">Datei herunterladen</a>';
     body.appendChild(p);
   }
-  document.getElementById("viewerDlg").showModal();
+  var dlg=document.getElementById("viewerDlg");
+  dlg.showModal();
+  // v1.4: Dialog in den Verlauf, damit System-Zurück ihn schließt
+  if(historyReady){ try{ history.pushState({wtd:currentView,dlg:"viewer"},""); }catch(e){} }
 }
+document.getElementById("viewerEdit").addEventListener("click",function(){
+  // v1.4: Textanhänge nachträglich ändern
+  var e=curEntry(); if(!e||!currentViewerAttId) return;
+  var att=null; e.attachments.forEach(function(a){ if(a.id===currentViewerAttId) att=a; });
+  if(!att||att.type!=="text") return;
+  document.getElementById("textEditArea").value=att.text||"";
+  document.getElementById("textEditPanel").style.display="";
+  document.getElementById("viewerEdit").style.display="none";
+});
+document.getElementById("textEditSave").addEventListener("click",function(){
+  var e=curEntry(); if(!e||!currentViewerAttId) return;
+  var att=null; e.attachments.forEach(function(a){ if(a.id===currentViewerAttId) att=a; });
+  if(!att) return;
+  var t=document.getElementById("textEditArea").value;
+  if(!t.trim()){ alert("Der Text darf nicht leer sein. Zum Entfernen nutze „Anhang löschen“."); return; }
+  att.text=t; att.name="Notiz";
+  save();
+  document.getElementById("textEditPanel").style.display="none";
+  document.getElementById("viewerEdit").style.display="";
+  openViewer(currentViewerAttId);
+  renderDetail();
+});
+document.getElementById("textEditCancel").addEventListener("click",function(){
+  document.getElementById("textEditPanel").style.display="none";
+  document.getElementById("viewerEdit").style.display="";
+});
 document.getElementById("viewerDelete").addEventListener("click",function(){
   var e=curEntry(); if(!e||!currentViewerAttId) return;
   if(!confirm("Diesen Anhang löschen?")) return;
   e.attachments=e.attachments.filter(function(a){return a.id!==currentViewerAttId;});
   save(); document.getElementById("viewerDlg").close(); renderDetail();
 });
+document.getElementById("viewerDlg").addEventListener("close",function(){
+  if(document.getElementById("textEditPanel").style.display===""){
+    document.getElementById("textEditPanel").style.display="none";
+  }
+  currentViewerAttId=null;
+});
 
-/* ---- Text-Anhang ---- */
+/* ---- Text-Anhang (neu) ---- */
 document.getElementById("attText").addEventListener("click",function(){
   document.getElementById("textAttArea").value="";
   document.getElementById("textAttPanel").style.display="";
@@ -633,16 +696,19 @@ document.getElementById("textAttSave").addEventListener("click",function(){
   save(); document.getElementById("textAttPanel").style.display="none"; renderDetail();
 });
 
-/* ---- Datei/Bild-Anhang (gemeinsame Prüfung) ---- */
-document.getElementById("attImage").addEventListener("click",function(){ pickFile("image/*"); });
-document.getElementById("attFile").addEventListener("click",function(){ pickFile(""); });
-function pickFile(accept){
+/* ---- Bild / Video / Datei ---- */
+document.getElementById("attImage").addEventListener("click",function(){ pickAny("image/*","Bild"); });
+document.getElementById("attVideo").addEventListener("click",function(){ pickAny("video/*","Video"); });
+document.getElementById("attFile").addEventListener("click",function(){ pickAny("","Datei"); });
+function pickAny(accept,label){
   var inp=document.createElement("input");
   inp.type="file"; if(accept) inp.accept=accept;
   inp.onchange=function(){
     var f=inp.files[0]; if(!f) return;
-    if(f.type&&f.type.indexOf("video")===0){ alert("Videos werden nicht unterstützt."); return; }
-    if(f.size>MAX_ATTACH){ alert("Datei ist "+fmtMB(f.size)+" MB — zu groß. Maximum: 10 MB pro Anhang."); return; }
+    if(f.size>MAX_ATTACH){
+      alert(label+" ist "+fmtMB(f.size)+" MB — zu groß.\nMaximum: 10 MB pro Anhang.\nTipp: Video in niedrigerer Qualität aufnehmen/exportieren (z. B. 720p) oder kürzen.");
+      return;
+    }
     var r=new FileReader();
     r.onload=function(){ addBlobAtt(f.name,f.type,r.result); };
     r.readAsDataURL(f);
@@ -656,19 +722,30 @@ function addBlobAtt(name,mime,dataUrl){
 }
 function fmtMB(n){ return (n/1048576).toFixed(1); }
 
-/* ---- Audio-Upload ---- */
+/* ---- Audio-Upload (ohne accept-Beschränkung, mobil-tauglich) ---- */
 document.getElementById("attAudioUp").addEventListener("click",function(){
   var inp=document.createElement("input");
-  inp.type="file"; inp.accept="audio/*";
   inp.onchange=function(){
     var f=inp.files[0]; if(!f) return;
+    var isAudio=(f.type&&f.type.indexOf("audio")===0)||
+                /\.(mp3|m4a|aac|ogg|oga|opus|wav|webm|flac|amr|3gp)$/i.test(f.name||"");
+    if(!isAudio){ alert("Das scheint keine Audiodatei zu sein. Nutze für andere Dateitypen den „Datei"-Button."); return; }
     if(f.size>MAX_ATTACH){ alert("Audiodatei ist "+fmtMB(f.size)+" MB — zu groß. Maximum: 10 MB."); return; }
+    var mime=f.type||guessAudioMime(f.name);
     var r=new FileReader();
-    r.onload=function(){ addBlobAtt(f.name,f.type||"audio/mpeg",r.result); };
+    r.onload=function(){ addBlobAtt(f.name,mime,r.result); };
     r.readAsDataURL(f);
   };
   inp.click();
 });
+function guessAudioMime(name){
+  if(/\.mp3$/i.test(name||"")) return "audio/mpeg";
+  if(/\.m4a$|\.aac$/i.test(name||"")) return "audio/mp4";
+  if(/\.ogg$|\.oga$|\.opus$/i.test(name||"")) return "audio/ogg";
+  if(/\.wav$/i.test(name||"")) return "audio/wav";
+  if(/\.webm$/i.test(name||"")) return "audio/webm";
+  return "audio/mpeg";
+}
 
 /* ---- Audio-Aufnahme (MediaRecorder, WebM/Opus) ---- */
 var mediaRecorder=null, chunks=[], recStart=0, recTimer=null, recStream=null;
@@ -718,9 +795,11 @@ document.getElementById("recCancel").addEventListener("click",function(){
 });
 
 /* ===================== Export / Import ===================== */
-document.getElementById("btnBackup").addEventListener("click",function(){ document.getElementById("backupDlg").showModal(); });
+document.getElementById("btnBackup").addEventListener("click",function(){
+  document.getElementById("backupDlg").showModal();
+  if(historyReady){ try{ history.pushState({wtd:currentView,dlg:"backup"},""); }catch(e){} }
+});
 document.getElementById("btnExport").addEventListener("click",function(){
-  // v1.2: Farbschema-Einstellung wird im Backup mitgeführt
   var payload={app:"what-to-do",version:2,exported:new Date().toISOString(),data:state};
   var blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
   var url=URL.createObjectURL(blob);
@@ -741,6 +820,7 @@ document.getElementById("importFile").addEventListener("change",function(ev){
       lastParsedImport=parsed.data;
       document.getElementById("backupDlg").close();
       document.getElementById("importModeDlg").showModal();
+      if(historyReady){ try{ history.pushState({wtd:currentView,dlg:"import"},""); }catch(e){} }
     }catch(err){ alert("Import fehlgeschlagen: "+err.message); }
   };
   r.readAsText(f);
@@ -782,8 +862,7 @@ function syncThemeInputs(){
   document.getElementById("themeWindowRow").hidden=state.theme.mode!=="window";
 }
 
-/* --- Zusammenführen: Gebiete/Einträge per Name (Groß/Klein egal),
-       Anhänge als Duplikate nach Name + Inhalt erkennen --- */
+/* --- Zusammenführen --- */
 function normName(s){ return String(s||"").trim().toLowerCase(); }
 function mergeIntoState(imp){
   var stats={areas:0,entries:0,attaches:0};
@@ -834,7 +913,10 @@ function deepCopyAtt(att){
 }
 
 /* ===================== Hilfe ===================== */
-document.getElementById("btnHelp").addEventListener("click",function(){ document.getElementById("helpDlg").showModal(); });
+document.getElementById("btnHelp").addEventListener("click",function(){
+  document.getElementById("helpDlg").showModal();
+  if(historyReady){ try{ history.pushState({wtd:currentView,dlg:"help"},""); }catch(e){} }
+});
 
 /* ===================== Notfallspeichern ===================== */
 window.addEventListener("pagehide",persistState);
@@ -852,7 +934,13 @@ openDB(function(){
     ensureTheme();
     syncThemeInputs();
     applyTheme();
-    renderAreas(); showView("viewAreas");
+    showView("viewAreas");
+    // v1.4: Startzustand in die History, danach arbeitet der System-Zurück-Button
+    try{
+      history.replaceState({wtd:"viewAreas"},"");
+      history.pushState({wtd:"viewAreas"},"");
+      historyReady=true;
+    }catch(e){ historyReady=false; }
   });
 });
 </script>
