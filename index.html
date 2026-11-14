@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================
-  What-To-Do  —  Version 1.1 (13.11.2026)
+  What-To-Do  —  Version 1.2 (14.11.2026)
   ============================================================
   Ideen- und Vorschlags-Tool: Themengebiete anlegen
   (z.B. "Essen", "Abendbeschäftigung"), Einträge erfassen,
@@ -12,25 +12,32 @@
 
   VERSIONSHISTORIE
   ----------------
+  v1.2 (14.11.2026)
+    - Dark Mode übernommen aus Still-Tracker v21 (uniform):
+      * 3 Modi: Manuell (Standard), Zeitfenster (Standard
+        20:00-07:00, über Mitternacht möglich), OS/System folgen
+      * Schnellumschalter (Mond/Sonne) im Kopf, in jedem Modus
+        wirksam: schaltet sofort um und stellt auf "manuell"
+      * Sanfter Farbwechsel per Transition (.45s ease)
+      * Dynamische Meta-Theme-Farbe; alle Elemente folgen dem
+        Theme (inkl. Dialoge, Warnleiste, Ziehungsbox)
+      * Theme-Einstellung wird gespeichert und im Backup
+        mitgeführt; Import/Export erhält sie
+    - Helfer-Text (Hilfe-Dialog) um Farbschema-Kapitel ergänzt
   v1.1 (13.11.2026)
     - "Nochmal ziehen" entfernt (gleiche Funktion wie
       "Vorschlag ziehen")
-    - Import kann jetzt ZUSAMMENFÜHREN statt nur ersetzen:
+    - Import kann ZUSAMMENFÜHREN statt nur ersetzen:
       Gebiete und Einträge werden anhand des Namens abgeglichen,
       Anhänge werden kombiniert (Duplikate nach Name+Inhalt
-      bleiben einmalig). So lassen sich Sicherungen von zwei
-      Geräten vereinen, ohne Daten zu verlieren. "Ersetzen"
-      ist weiterhin als Option verfügbar.
+      bleiben einmalig). "Ersetzen" weiterhin verfügbar.
   v1.0 (13.11.2026)
     - Erste Version
     - 3 Ebenen: Themengebiete -> Einträge -> Zufallsziehung
-    - Reiner Zufall, Ausschluss durch erneutes Ziehen
     - Anhänge: Text / Bild / Datei / Audio (Upload + Aufnahme)
     - Speicherung in IndexedDB ("what-to-do-db", Store "kv")
-    - Sofortspeichern bei jeder Änderung; Notfallspeichern bei
-      pagehide/beforeunload/visibilitychange
-    - JSON-Export/Import (alles inkl. Anhänge, Base64)
-    - Hilfe-Dialog; rote Warnung bei Speicherproblemen
+    - Sofortspeichern; JSON-Export/Import; Hilfe-Dialog;
+      rote Warnung bei Speicherproblemen
     - Design angelehnt an Still-Tracker v20
   ============================================================
 -->
@@ -38,21 +45,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#f6eee7" id="metaThemeColor">
 <title>What-To-Do</title>
 <style>
   :root{
-    --bg:#f6eee7; --panel:#fffaf5; --red:#bd6553; --gold:#cfa75f;
-    --gold-light:#d9b989; --ink:#3d2f28; --muted:#8a7568; --line:#e4d6c9;
+    color-scheme: light;
+    --bg:#f6eee7; --panel:#fffaf5; --surface:#fffdfb;
+    --ink:#342a27; --muted:#796b65; --line:#eaded5;
+    --red:#bd6553; --gold:#cfa75f; --gold-ink:#5f4c22;
+    --btn-bg:#ffffff;
+    --danger:#c0392b;
+    --backdrop:#342a2788;
+  }
+  html[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#1c1714; --panel:#29221e; --surface:#211b17;
+    --ink:#f0e7df; --muted:#a3938a; --line:#3d342e;
+    --red:#c97a67; --gold:#d8b070; --gold-ink:#2e2513;
+    --btn-bg:#332b26;
+    --danger:#e8a596;
+    --backdrop:#000000aa;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;background:var(--bg);color:var(--ink);
        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
        padding-bottom:90px}
+  /* v1.2: sanfter Theme-Übergang statt abruptem Umsprung */
+  body, header, .card, button, input, dialog, textarea, .item,
+  .entry-item, .draw-box, .attachment, .warnbar, dialog::backdrop, audio {
+    transition: background-color .45s ease, border-color .45s ease,
+                color .45s ease, box-shadow .45s ease;
+  }
   header{background:var(--red);color:#fff;padding:14px 16px;display:flex;
          align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
   header h1{margin:0;font-size:1.15rem;font-weight:600}
   .hbtn{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;
         padding:7px 11px;font-size:.85rem;cursor:pointer;margin-left:6px}
+  /* v1.2: Schnellumschalter hell/dunkel */
+  .theme-quick{
+    background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;
+    min-width:44px;min-height:38px;padding:0 10px;font-size:1.05rem;
+    cursor:pointer;margin-left:6px;line-height:1;
+  }
   main{max-width:640px;margin:0 auto;padding:12px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
         padding:14px;margin-bottom:12px}
@@ -64,37 +98,37 @@
   .btn.ghost{background:transparent;color:var(--red);border:1px solid var(--red)}
   .btn.small{padding:6px 10px;font-size:.82rem}
   input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;
-       background:#fff;font-size:.95rem}
+       background:var(--btn-bg);color:var(--ink);font-size:.95rem}
   .area-list .item{display:flex;align-items:center;justify-content:space-between;
-       background:#fff;border:1px solid var(--line);border-radius:10px;
+       background:var(--surface);border:1px solid var(--line);border-radius:10px;
        padding:12px;margin-bottom:8px;cursor:pointer}
   .area-list .item .name{font-weight:600}
   .area-list .item .cnt{color:var(--muted);font-size:.85rem;margin-left:8px}
   .row{display:flex;gap:8px;margin-top:10px}
   .row input{flex:1}
-  .entry-item{background:#fff;border:1px solid var(--line);border-radius:10px;
+  .entry-item{background:var(--surface);border:1px solid var(--line);border-radius:10px;
        padding:10px 12px;margin-bottom:8px}
   .entry-item .title{font-weight:600}
   .entry-item .att{color:var(--muted);font-size:.8rem;margin-top:2px}
   .entry-actions{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
-  .draw-box{background:#fff;border:2px dashed var(--gold);border-radius:12px;
+  .draw-box{background:var(--surface);border:2px dashed var(--gold);border-radius:12px;
        padding:22px;text-align:center;min-height:110px;display:flex;
        flex-direction:column;justify-content:center}
   .draw-box .big{font-size:1.3rem;font-weight:700;margin-bottom:4px}
   .draw-box .sub{color:var(--muted);font-size:.85rem}
   .muted{color:var(--muted);font-size:.85rem}
-  .warnbar{display:none;background:#c0392b;color:#fff;padding:10px 14px;
+  .warnbar{display:none;background:#3a2723;color:var(--danger);padding:10px 14px;
        font-size:.9rem;text-align:center}
   .warnbar.show{display:block}
   dialog{border:none;border-radius:14px;max-width:560px;width:92%;padding:20px;
-       background:var(--panel)}
-  dialog::backdrop{background:rgba(0,0,0,.45)}
+       background:var(--panel);color:var(--ink)}
+  dialog::backdrop{background:var(--backdrop)}
   dialog h2{margin-top:0}
-  .atts .attachment{background:#f6eee7;border-radius:8px;padding:8px 10px;
+  .atts .attachment{background:var(--bg);border-radius:8px;padding:8px 10px;
        margin-top:6px;font-size:.88rem;display:flex;justify-content:space-between;gap:8px;align-items:center}
   .att-view{color:var(--red);cursor:pointer;font-weight:600;text-decoration:underline}
   textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;
-       padding:8px;font-family:inherit;font-size:.92rem;background:#fff}
+       padding:8px;font-family:inherit;font-size:.92rem;background:var(--btn-bg);color:var(--ink)}
   #recDot{display:inline-block;width:10px;height:10px;border-radius:50%;
        background:#c0392b;margin-right:6px;animation:blink 1s infinite}
   @keyframes blink{50%{opacity:.2}}
@@ -104,6 +138,15 @@
   .navbar .crumb{color:var(--muted);font-size:.85rem;align-self:center;margin-right:auto;margin-left:14px}
   audio{width:100%;margin-top:6px}
   img.thumb{max-width:120px;max-height:90px;border-radius:8px;display:block;margin-top:6px}
+  /* v1.2: Theme-Einstellungen */
+  .setting-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .setting-row + .setting-row{margin-top:10px}
+  .setting-row p{margin:0;font-size:.92rem}
+  .setting-row select{min-height:40px;padding:4px 10px;border:1px solid var(--line);
+       border-radius:10px;background:var(--btn-bg);color:var(--ink);font-size:.9rem}
+  .setting-row input[type=time]{min-height:40px;padding:4px 8px;border:1px solid var(--line);
+       border-radius:10px;background:var(--btn-bg);color:var(--ink);font-size:.9rem}
+  #themeWindowRow[hidden]{display:none !important}
 </style>
 </head>
 <body>
@@ -113,6 +156,7 @@
   <div>
     <button class="hbtn" id="btnBackup">Sicherung</button>
     <button class="hbtn" id="btnHelp">Hilfe</button>
+    <button class="theme-quick" id="themeQuick" type="button" title="Hell/Dunkel umschalten">🌙</button>
   </div>
 </header>
 
@@ -185,15 +229,40 @@
       <div class="atts" id="attList"></div>
     </div>
   </section>
+
+  <!-- v1.2: Einstellungen (Farbschema) -->
+  <section id="viewSettings" style="display:none">
+    <div class="card">
+      <h2>Farbschema</h2>
+      <div class="setting-row">
+        <p>Farbschema</p>
+        <select id="themeMode">
+          <option value="manual">manuell umschalten</option>
+          <option value="window">nach Zeitfenster</option>
+          <option value="os">wie System/Browser</option>
+        </select>
+      </div>
+      <div class="setting-row" id="themeWindowRow" hidden>
+        <p>Dunkel von … bis …</p>
+        <span style="display:flex;gap:6px;align-items:center">
+          <input type="time" id="themeStart" value="20:00">
+          <input type="time" id="themeEnd" value="07:00">
+        </span>
+      </div>
+      <p class="muted" style="margin-top:10px">Der Mond/Sonne-Button oben rechts wirkt in jedem
+      Modus: ein Tipp schaltet sofort um und stellt zugleich auf „manuell" um.</p>
+    </div>
+  </section>
 </main>
 
 <div class="navbar">
   <span class="crumb" id="crumb">Themengebiete</span>
+  <button class="btn ghost small" id="btnSettings" style="margin-right:8px">⚙️ Einstellungen</button>
   <button class="btn ghost small" id="btnBack" style="display:none">← Zurück</button>
 </div>
 
 <dialog id="helpDlg">
-  <h2>Hilfe — What-To-Do v1.1</h2>
+  <h2>Hilfe — What-To-Do v1.2</h2>
   <p><b>Themengebiete</b> sind Sammlungen, z. B. „Essen" oder „Abendbeschäftigung".
   Lege oben ein Gebiet an und tippe es an, um Einträge hinzuzufügen.</p>
   <p><b>Vorschlag ziehen:</b> Der 🎲-Button wählt per reinem Zufall einen Eintrag aus.
@@ -202,22 +271,32 @@
   (Upload oder direkt eingesprochen) enthalten. Obergrenze: 10 MB pro Anhang.
   Aufnahmen werden platzsparend als WebM/Opus gespeichert.</p>
   <p><b>Sicherung &amp; Teilen:</b> Export erstellt eine JSON-Datei mit allen Daten
-  (inkl. aller Anhänge). Beim <b>Import</b> wählst du:</p>
+  (inkl. aller Anhänge und der Farbschema-Einstellung). Beim <b>Import</b> wählst du:</p>
   <ul>
     <li><b>Zusammenführen:</b> Inhalte der Datei werden mit den vorhandenen kombiniert —
     ideal, um Sicherungen von zwei Geräten zu vereinen. Gleiche Gebiete/Einträge (gleicher Name)
     werden verbunden, doppelte Anhänge bleiben nur einmal.</li>
     <li><b>Ersetzen:</b> Alle vorhandenen Daten werden durch die Datei ersetzt.</li>
   </ul>
+  <h4 style="margin-bottom:4px">Farbschema (hell/dunkel)</h4>
+  <ul>
+    <li><b>Manuell:</b> Umschalten über den Mond/Sonne-Button oben rechts oder unter Einstellungen. Das ist der Standard.</li>
+    <li><b>Zeitfenster:</b> Dunkel automatisch in einem Zeitraum (z. B. 20:00–07:00, auch über Mitternacht möglich), sonst hell.</li>
+    <li><b>Wie System/Browser:</b> Folgt der Hell/Dunkel-Einstellung deines Geräts.</li>
+    <li>Der Mond/Sonne-Button wirkt in jedem Modus: ein Tipp schaltet sofort um und stellt gleichzeitig auf „manuell" um.</li>
+    <li>Der Wechsel erfolgt weich überblendet statt abrupt.</li>
+  </ul>
   <p class="muted">Alle Daten liegen ausschließlich lokal in diesem Browser (IndexedDB).
-  Löschen der Browserdaten löscht auch sie — regelmäßig exportieren!</p>
-  <p class="muted">What-To-Do v1.1, 13.11.2026</p>
+  Löschen der Browserdaten löscht auch sie — regelmäßig exportieren! Beachte: Lokal geöffnete
+  Dateien (Doppelklick) haben je nach Browser einen eigenen Speicher pro Datei; am stabilen
+  Speicher erreichst du die App am besten immer über denselben Weg (z. B. GitHub Pages).</p>
+  <p class="muted">What-To-Do v1.2, 14.11.2026</p>
   <div style="text-align:right"><button class="btn" onclick="document.getElementById('helpDlg').close()">Schließen</button></div>
 </dialog>
 
 <dialog id="backupDlg">
   <h2>Sicherung &amp; Teilen</h2>
-  <p>Export enthält <b>alle</b> Gebiete, Einträge und Anhänge (Base64-kodiert).</p>
+  <p>Export enthält <b>alle</b> Gebiete, Einträge, Anhänge (Base64-kodiert) und die Farbschema-Einstellung.</p>
   <div class="row" style="flex-wrap:wrap">
     <button class="btn" id="btnExport">⬇️ Exportieren</button>
     <button class="btn ghost" id="btnImport">⬆️ Importieren</button>
@@ -285,9 +364,10 @@ function loadState(cb){
    state = {
      areas: [ { id, name,
                 entries: [ { id, name,
-                    attachments: [ {id,type:"text"|"blob",mime,name,text?,data?} ] } ] } ]
+                    attachments: [ {id,type:"text"|"blob",mime,name,text?,data?} ] } ] } ],
+     theme: { mode:"manual"|"window"|"os", dark:boolean, start:"HH:MM", end:"HH:MM" }
    } */
-var state={areas:[]};
+var state={areas:[],theme:{mode:"manual",dark:false,start:"20:00",end:"07:00"}};
 var currentAreaId=null, currentEntryId=null;
 var lastParsedImport=null;
 
@@ -301,8 +381,76 @@ function save(){ persistState(); }
 function showWarn(msg){ var w=document.getElementById("warnbar"); w.textContent="⚠️ "+msg; w.classList.add("show"); }
 function hideWarn(){ document.getElementById("warnbar").classList.remove("show"); }
 
+/* ===================== Theme (v1.2, übernommen aus Still-Tracker v21) ===================== */
+var LIGHT_THEME_COLOR="#f6eee7", DARK_THEME_COLOR="#1c1714";
+
+function ensureTheme(){
+  if(!state.theme||typeof state.theme!=="object") state.theme={mode:"manual",dark:false,start:"20:00",end:"07:00"};
+  if(["manual","window","os"].indexOf(state.theme.mode)<0) state.theme.mode="manual";
+  if(typeof state.theme.start!=="string"||!/^\d{2}:\d{2}$/.test(state.theme.start)) state.theme.start="20:00";
+  if(typeof state.theme.end!=="string"||!/^\d{2}:\d{2}$/.test(state.theme.end)) state.theme.end="07:00";
+  state.theme.dark=Boolean(state.theme.dark);
+}
+function minutesOf(hhmm){
+  var parts=String(hhmm||"").split(":");
+  var h=parseInt(parts[0],10), m=parseInt(parts[1],10);
+  if(!isFinite(h)||!isFinite(m)) return null;
+  return h*60+m;
+}
+function inWindow(now){
+  var cur=now.getHours()*60+now.getMinutes();
+  var s=minutesOf(state.theme.start), e=minutesOf(state.theme.end);
+  if(s===null||e===null||s===e) return false;
+  // Fenster über Mitternacht (z. B. 20:00–07:00)
+  return s<e ? (cur>=s&&cur<e) : (cur>=s||cur<e);
+}
+var osDarkQuery=window.matchMedia?window.matchMedia("(prefers-color-scheme: dark)"):null;
+function themeShouldBeDark(now){
+  if(state.theme.mode==="os") return osDarkQuery?osDarkQuery.matches:false;
+  if(state.theme.mode==="window") return inWindow(now);
+  return state.theme.dark;
+}
+function applyTheme(){
+  var dark=themeShouldBeDark(new Date());
+  document.documentElement.setAttribute("data-theme",dark?"dark":"light");
+  document.getElementById("metaThemeColor").setAttribute("content",dark?DARK_THEME_COLOR:LIGHT_THEME_COLOR);
+  document.getElementById("themeQuick").textContent=dark?"☀️":"🌙";
+  document.getElementById("themeQuick").title=dark?"Helles Design aktivieren":"Dunkles Design aktivieren";
+}
+function setThemeMode(mode){
+  state.theme.mode=mode;
+  if(mode==="manual") state.theme.dark=document.documentElement.getAttribute("data-theme")==="dark";
+  document.getElementById("themeMode").value=mode;
+  document.getElementById("themeWindowRow").hidden=mode!=="window";
+  applyTheme(); save();
+}
+document.getElementById("themeQuick").addEventListener("click",function(){
+  // Sofort umschalten und auf manuell umstellen (dauerhaftes Übersteuern)
+  var dark=document.documentElement.getAttribute("data-theme")==="dark";
+  state.theme.mode="manual";
+  state.theme.dark=!dark;
+  document.getElementById("themeMode").value="manual";
+  document.getElementById("themeWindowRow").hidden=true;
+  applyTheme(); save();
+});
+document.getElementById("themeMode").addEventListener("change",function(){ setThemeMode(this.value); });
+document.getElementById("themeStart").addEventListener("change",function(){ state.theme.start=this.value; applyTheme(); save(); });
+document.getElementById("themeEnd").addEventListener("change",function(){ state.theme.end=this.value; applyTheme(); save(); });
+if(osDarkQuery){
+  var osHandler=function(){ if(state.theme.mode==="os") applyTheme(); };
+  if(osDarkQuery.addEventListener) osDarkQuery.addEventListener("change",osHandler);
+  else if(osDarkQuery.addListener) osDarkQuery.addListener(osHandler);
+}
+// v1.2: Zeitfenster- und OS-Modus laufend prüfen (wie Still-Tracker v21)
+setInterval(function(){
+  if(state.theme.mode!=="manual"){
+    var dark=themeShouldBeDark(new Date());
+    if((document.documentElement.getAttribute("data-theme")==="dark")!==dark) applyTheme();
+  }
+},500);
+
 /* ===================== Navigation ===================== */
-var views=["viewAreas","viewEntries","viewDetail"];
+var views=["viewAreas","viewEntries","viewDetail","viewSettings"];
 function showView(v){
   views.forEach(function(id){ document.getElementById(id).style.display=(id===v)?"":"none"; });
   var back=document.getElementById("btnBack");
@@ -310,12 +458,16 @@ function showView(v){
   if(v==="viewAreas"){ back.style.display="none"; crumb.textContent="Themengebiete"; }
   if(v==="viewEntries"){ back.style.display=""; crumb.textContent=curArea()?curArea().name:""; }
   if(v==="viewDetail"){ back.style.display=""; crumb.textContent=(curArea()?curArea().name:"")+" › "+(curEntry()?curEntry().name:""); }
+  if(v==="viewSettings"){ back.style.display="none"; crumb.textContent="Einstellungen"; }
   window.scrollTo(0,0);
 }
 document.getElementById("btnBack").addEventListener("click",function(){
   if(currentEntryId && document.getElementById("viewDetail").style.display===""){
     currentEntryId=null; renderEntries(); showView("viewEntries");
   } else { currentAreaId=null; renderAreas(); showView("viewAreas"); }
+});
+document.getElementById("btnSettings").addEventListener("click",function(){
+  showView("viewSettings");
 });
 
 /* ===================== Gebiete ===================== */
@@ -444,7 +596,7 @@ function openViewer(attId){
   var body=document.getElementById("viewerBody"); body.innerHTML="";
   if(att.type==="text"){
     var pre=document.createElement("div");
-    pre.style.whiteSpace="pre-wrap"; pre.style.background="#fff";
+    pre.style.whiteSpace="pre-wrap"; pre.style.background="var(--surface)";
     pre.style.padding="10px"; pre.style.borderRadius="8px";
     pre.textContent=att.text||""; body.appendChild(pre);
   } else if(att.mime&&att.mime.indexOf("image")===0){
@@ -568,7 +720,8 @@ document.getElementById("recCancel").addEventListener("click",function(){
 /* ===================== Export / Import ===================== */
 document.getElementById("btnBackup").addEventListener("click",function(){ document.getElementById("backupDlg").showModal(); });
 document.getElementById("btnExport").addEventListener("click",function(){
-  var payload={app:"what-to-do",version:1,exported:new Date().toISOString(),data:state};
+  // v1.2: Farbschema-Einstellung wird im Backup mitgeführt
+  var payload={app:"what-to-do",version:2,exported:new Date().toISOString(),data:state};
   var blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
   var url=URL.createObjectURL(blob);
   var a=document.createElement("a");
@@ -603,6 +756,9 @@ document.getElementById("impReplace").addEventListener("click",function(){
     return;
   }
   state=lastParsedImport;
+  ensureTheme();
+  syncThemeInputs();
+  applyTheme();
   afterImport("Ersetzen abgeschlossen.");
 });
 document.getElementById("impMerge").addEventListener("click",function(){
@@ -618,6 +774,12 @@ function afterImport(msg){
   save(); renderAreas(); showView("viewAreas");
   document.getElementById("importModeDlg").close();
   alert(msg);
+}
+function syncThemeInputs(){
+  document.getElementById("themeMode").value=state.theme.mode;
+  document.getElementById("themeStart").value=state.theme.start;
+  document.getElementById("themeEnd").value=state.theme.end;
+  document.getElementById("themeWindowRow").hidden=state.theme.mode!=="window";
 }
 
 /* --- Zusammenführen: Gebiete/Einträge per Name (Groß/Klein egal),
@@ -686,6 +848,10 @@ function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").rep
 openDB(function(){
   loadState(function(raw){
     if(raw){ try{ state=JSON.parse(raw); }catch(e){ state={areas:[]}; } }
+    if(!state.areas) state.areas=[];
+    ensureTheme();
+    syncThemeInputs();
+    applyTheme();
     renderAreas(); showView("viewAreas");
   });
 });
