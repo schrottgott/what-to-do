@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================
-  What-To-Do  —  Version 1.5.1 (14.11.2026)
+  What-To-Do  —  Version 1.5.2 (14.11.2026)
   ============================================================
   Ideen- und Vorschlags-Tool: Themengebiete anlegen
   (z.B. "Essen", "Abendbeschäftigung"), Einträge erfassen,
@@ -10,13 +10,18 @@
 
   VERSIONSHISTORIE
   ----------------
+  v1.5.2 (14.11.2026)
+    - Ziehungsergebnis: größere Schrift (dezent dominant),
+      Antippen des Vorschlags öffnet direkt den Eintrag;
+      Button "Anhänge ansehen" entfällt
+    - Textanhänge zeigen in der Liste den Textanfang
+      (gekürzt) statt nur "Notiz"
+    - Alle Anhänge öffnen sich durch Antippen des Feldes;
+      "Ansehen"-Links entfernt
   v1.5.1 (14.11.2026)
-    - "Datei" = ausschließlich Dokumente (PDF, Text, Office,
-      Zip), über Endungen statt Medientypen: dadurch bietet das
-      Smartphone nur den Dateiordner an (keine Kamera-Optionen,
-      keine Video-Kamera, kein Mikrofon-Prompt)
-    - Einträge lassen sich durch direktes Antippen öffnen;
-      "Bearbeiten"-Button entfernt, "Löschen" rechts angeordnet
+    - "Datei" = nur Dokumente (Endungsliste): nur Dateiordner,
+      keine Kamera, kein Mikrofon-Prompt; Einträge per
+      Antippen öffnen; "Bearbeiten" entfernt, "Löschen" rechts
   v1.5 (14.11.2026)
     - Buttons "Video"/"Audio hochladen" entfernt; Umbenennen
       greift sofort
@@ -108,9 +113,11 @@
   .entry-actions{display:flex;gap:6px;flex-shrink:0}
   .draw-box{background:var(--surface);border:2px dashed var(--gold);border-radius:12px;
        padding:22px;text-align:center;min-height:110px;display:flex;
-       flex-direction:column;justify-content:center}
-  .draw-box .big{font-size:1.3rem;font-weight:700;margin-bottom:4px}
+       flex-direction:column;justify-content:center;cursor:pointer}
+  .draw-box .big{font-size:1.6rem;font-weight:700;margin-bottom:6px;line-height:1.25;
+       word-break:break-word}
   .draw-box .sub{color:var(--muted);font-size:.85rem}
+  .draw-box .tap{color:var(--muted);font-size:.78rem;margin-top:10px}
   .muted{color:var(--muted);font-size:.85rem}
   .warnbar{display:none;background:#3a2723;color:var(--danger);padding:10px 14px;
        font-size:.9rem;text-align:center}
@@ -120,8 +127,8 @@
   dialog::backdrop{background:var(--backdrop)}
   dialog h2{margin-top:0}
   .atts .attachment{background:var(--bg);border-radius:8px;padding:8px 10px;
-       margin-top:6px;font-size:.88rem;display:flex;justify-content:space-between;gap:8px;align-items:center}
-  .att-view{color:var(--red);cursor:pointer;font-weight:600;text-decoration:underline}
+       margin-top:6px;font-size:.88rem;display:flex;justify-content:space-between;gap:8px;align-items:center;cursor:pointer}
+  .att-view{color:var(--muted);font-size:.78rem}
   textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;
        padding:8px;font-family:inherit;font-size:.92rem;background:var(--btn-bg);color:var(--ink)}
   #recDot{display:inline-block;width:10px;height:10px;border-radius:50%;
@@ -221,7 +228,8 @@
       <div class="atts" id="attList"></div>
       <p class="muted" style="margin-top:8px">Maximalgröße pro Anhang: 10 MB.
       „Bild“ = Kamera oder Galerie; „Datei“ = Dokumente aus dem Dateiordner
-      (PDF, Text, Office, Zip); „Aufnahme“ = direkt einsprechen.</p>
+      (PDF, Text, Office, Zip); „Aufnahme“ = direkt einsprechen.
+      Anhänge durch Antippen öffnen.</p>
     </div>
   </section>
 
@@ -257,16 +265,18 @@
 </div>
 
 <dialog id="helpDlg">
-  <h2>Hilfe — What-To-Do v1.5.1</h2>
+  <h2>Hilfe — What-To-Do v1.5.2</h2>
   <p><b>Themengebiete</b> sind Sammlungen, z. B. „Essen“ oder „Abendbeschäftigung“.
   Lege oben ein Gebiet an und tippe es an, um Einträge hinzuzufügen.</p>
+  <p><b>Vorschlag ziehen:</b> Der 🎲-Button wählt per reinem Zufall einen Eintrag aus.
+  Das Ergebnis wird groß in der Box angezeigt — <b>antippe es, um den Eintrag direkt
+  zu öffnen</b>. Gefällt der Vorschlag nicht: einfach noch einmal ziehen.</p>
   <p><b>Einträge öffnen:</b> Einträge einfach antippen — du kommst direkt in die
   Detailansicht mit den Anhängen. Löschen erfolgt über den Button rechts.</p>
-  <p><b>Vorschlag ziehen:</b> Der 🎲-Button wählt per reinem Zufall einen Eintrag aus.
-  Gefällt er nicht: einfach noch einmal ziehen. Jeder Eintrag ist gleich wahrscheinlich.</p>
   <p><b>Anhänge:</b> Jeder Eintrag kann Texte, Bilder, Dokumente und Audio
   (direkt eingesprochen) enthalten. Obergrenze: <b>10 MB pro Anhang</b>.
-  <b>Texte können nachträglich bearbeitet werden</b> (in der Anhangsansicht).
+  <b>Alle Anhänge öffnen sich durch Antippen.</b> Textanhänge zeigen in der Liste
+  ihren Textanfang und <b>können nachträglich bearbeitet werden</b> (in der Anhangsansicht).
   Aufnahmen werden platzsparend als WebM/Opus gespeichert.</p>
   <p><b>Datei-Typen:</b> „Bild“ = Kamera oder Galerie. „Datei“ = Dokumente aus dem
   Dateiordner (PDF, Text, Office, Zip). Audio läuft über „Aufnahme“.</p>
@@ -292,7 +302,7 @@
   Löschen der Browserdaten löscht auch sie — regelmäßig exportieren! Beachte: Lokal geöffnete
   Dateien (Doppelklick) haben je nach Browser einen eigenen Speicher pro Datei; am stabilen
   Speicher erreichst du die App am besten immer über denselben Weg (z. B. GitHub Pages).</p>
-  <p class="muted">What-To-Do v1.5.1, 14.11.2026</p>
+  <p class="muted">What-To-Do v1.5.2, 14.11.2026</p>
   <div style="text-align:right"><button class="btn" onclick="document.getElementById('helpDlg').close()">Schließen</button></div>
 </dialog>
 
@@ -345,9 +355,8 @@ var MAX_ATTACH=10*1024*1024; // 10 MB pro Anhang
 var DEFAULT_THEME={mode:"os",dark:false,start:"20:00",end:"07:00"};
 
 /* v1.5.1: "Datei" akzeptiert ausschließlich dokumentenartige
-   Endungen (KEINE Medientypen wie audio/* oder image/*). Das
-   zwingt Android-Browser, nur den Dateiordner anzubieten -
-   ohne Kamera-Optionen und ohne Mikrofon-Prompt. */
+   Endungen (KEINE Medientypen) - nur Dateiordner, keine
+   Kamera-Optionen, kein Mikrofon-Prompt. */
 var DOC_ACCEPT=".pdf,.txt,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,"
              +".odt,.ods,.odp,.zip,.json,.html,.htm,.epub";
 
@@ -547,8 +556,6 @@ function renderEntries(){
   if(a.entries.length===0){ el.innerHTML='<p class="muted">Noch keine Einträge.</p>'; return; }
   a.entries.forEach(function(e){
     var d=document.createElement("div"); d.className="entry-item";
-    /* v1.5.1: linker Block (Titel + Anhangszahl) öffnet per
-       Klick die Detailansicht; rechts nur noch Löschen */
     var left=document.createElement("div");
     left.innerHTML='<div class="title">'+esc(e.name)+'</div>'+
       '<div class="att">'+(e.attachments.length?e.attachments.length+" Anhang/Anhänge":"keine Anhänge")+'</div>';
@@ -587,13 +594,10 @@ function draw(){
   var pick=a.entries[Math.floor(Math.random()*a.entries.length)];
   var box=document.getElementById("drawBox");
   box.innerHTML='<div class="big">'+esc(pick.name)+'</div>'+
-    '<div class="sub">'+(pick.attachments.length?pick.attachments.length+" Anhang/Anhänge — im Eintrag ansehen":"")+'</div>';
-  if(pick.attachments.length){
-    var see=document.createElement("button"); see.className="btn ghost small"; see.textContent="Anhänge ansehen";
-    see.style.marginTop="8px";
-    see.addEventListener("click",function(){ currentEntryId=pick.id; renderDetail(); goTo("viewDetail"); });
-    box.appendChild(see);
-  }
+    '<div class="sub">'+(pick.attachments.length?pick.attachments.length+" Anhang/Anhänge":"")+'</div>'+
+    '<div class="tap">Antippen öffnet den Eintrag</div>';
+  /* v1.5.2: Vorschlag antippen = Eintrag direkt öffnen */
+  box.onclick=function(){ currentEntryId=pick.id; renderDetail(); goTo("viewDetail"); };
 }
 
 /* ===================== Detail / Anhänge ===================== */
@@ -603,6 +607,13 @@ function attIcon(att){
   if(att.mime&&att.mime.indexOf("video")===0) return "🎬";
   return att.type==="text"?"📝":"📄";
 }
+/* v1.5.2: Textanhang -> Anfang des Inhalts anzeigen (gekürzt) */
+function attPreview(att){
+  if(att.type!=="text") return "";
+  var t=String(att.text||"").replace(/\s+/g," ").trim();
+  if(!t) return "";
+  return t.length>80 ? t.slice(0,80)+"…" : t;
+}
 function renderDetail(){
   var e=curEntry(); if(!e) return;
   document.getElementById("detailTitle").textContent=e.name;
@@ -611,16 +622,23 @@ function renderDetail(){
   if(e.attachments.length===0){ el.innerHTML='<p class="muted">Noch keine Anhänge.</p>'; }
   e.attachments.forEach(function(att){
     var d=document.createElement("div"); d.className="attachment";
-    var info=document.createElement("span");
-    info.innerHTML=attIcon(att)+" "+esc(att.name||"Anhang");
-    d.appendChild(info);
-    var right=document.createElement("span");
-    var view=document.createElement("span"); view.className="att-view"; view.textContent="Ansehen";
-    view.addEventListener("click",function(){ openViewer(att.id); });
-    right.appendChild(view);
-    d.appendChild(right);
+    var left=document.createElement("div");
+    var html='<div>'+attIcon(att)+" "+esc(att.name||"Anhang")+'</div>';
+    var prev=attPreview(att);
+    if(prev) html+='<div class="muted" style="font-size:.8rem;margin-top:2px">'+esc(prev)+'</div>';
+    left.innerHTML=html;
+    left.style.minWidth="0";
+    d.appendChild(left);
+    /* v1.5.2: gesammtes Feld antippbar; kleiner Hinweis statt "Ansehen"-Link */
+    var hint=document.createElement("span");
+    hint.className="att-view"; hint.textContent="›";
+    hint.style.flexShrink="0";
+    d.appendChild(hint);
+    d.addEventListener("click",function(){ openViewer(att.id); });
     if(att.type==="blob"&&att.mime&&att.mime.indexOf("image")===0&&att.data){
-      var img=document.createElement("img"); img.className="thumb"; img.src=att.data; d.appendChild(img);
+      var img=document.createElement("img"); img.className="thumb"; img.src=att.data;
+      img.style.width="100%"; img.addEventListener("click",function(ev){ ev.stopPropagation(); openViewer(att.id); });
+      left.appendChild(img);
     }
     el.appendChild(d);
   });
