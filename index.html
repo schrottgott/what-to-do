@@ -1,34 +1,34 @@
 <!DOCTYPE html>
 <!--
   ============================================================
-  What-To-Do  —  Version 1.5 (14.11.2026)
+  What-To-Do  —  Version 1.5.1 (14.11.2026)
   ============================================================
   Ideen- und Vorschlags-Tool: Themengebiete anlegen
   (z.B. "Essen", "Abendbeschäftigung"), Einträge erfassen,
   per Zufall einen Vorschlag ziehen. Anhänge: Text (editierbar),
-  Bild, Datei, Audio (Aufnahme). Max. 10 MB/Anhang.
+  Bild, Datei (nur Dokumente), Audio (Aufnahme). Max. 10 MB/Anhang.
 
   VERSIONSHISTORIE
   ----------------
+  v1.5.1 (14.11.2026)
+    - "Datei" = ausschließlich Dokumente (PDF, Text, Office,
+      Zip), über Endungen statt Medientypen: dadurch bietet das
+      Smartphone nur den Dateiordner an (keine Kamera-Optionen,
+      keine Video-Kamera, kein Mikrofon-Prompt)
+    - Einträge lassen sich durch direktes Antippen öffnen;
+      "Bearbeiten"-Button entfernt, "Löschen" rechts angeordnet
   v1.5 (14.11.2026)
-    - Buttons "Video" und "Audio hochladen" entfernt (beides
-      läuft über "Datei"); "Datei" blendet über eine
-      Format-Positivliste die Video-Kamera-Option auf
-      Smartphones aus
-    - Umbenennen eines Eintrags greift jetzt sofort in allen
-      Ansichten (Eintragsliste, Brotkrumen, Titel)
+    - Buttons "Video"/"Audio hochladen" entfernt; Umbenennen
+      greift sofort
   v1.4.2 (14.11.2026)
-    - Startroutine: fehlendes renderAreas() ergänzt (Daten
-      wurden geladen, aber nicht angezeigt)
+    - Startroutine: fehlendes renderAreas() ergänzt
   v1.4.1 (14.11.2026)
     - Anführungszeichen-Fehler behoben; Notfallspeichern erst
-      nach erfolgreichem Laden; Start-Diagnose im
-      Sicherungs-Dialog
+      nach Laden; Start-Diagnose
   v1.4 (14.11.2026)
     - Text-Anhänge editierbar; System-Zurück-Button (History)
   v1.3 (14.11.2026)
-    - Farbschema-Standard = OS; Videos erlaubt; Audio-Upload
-      mobil ohne accept-Filter
+    - Farbschema-Standard = OS; Audio-Upload mobil ohne Filter
   v1.2 (14.11.2026)
     - Dark Mode aus Still-Tracker v21
   v1.1 (13.11.2026)
@@ -101,10 +101,11 @@
   .row{display:flex;gap:8px;margin-top:10px}
   .row input{flex:1}
   .entry-item{background:var(--surface);border:1px solid var(--line);border-radius:10px;
-       padding:10px 12px;margin-bottom:8px}
+       padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;
+       justify-content:space-between;gap:10px;cursor:pointer}
   .entry-item .title{font-weight:600}
   .entry-item .att{color:var(--muted);font-size:.8rem;margin-top:2px}
-  .entry-actions{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+  .entry-actions{display:flex;gap:6px;flex-shrink:0}
   .draw-box{background:var(--surface);border:2px dashed var(--gold);border-radius:12px;
        padding:22px;text-align:center;min-height:110px;display:flex;
        flex-direction:column;justify-content:center}
@@ -185,6 +186,7 @@
         <button class="btn" id="addEntry">Hinzufügen</button>
       </div>
       <div id="entryList" style="margin-top:10px"></div>
+      <p class="muted" style="margin-top:6px">Eintrag antippen zum Öffnen.</p>
     </div>
   </section>
 
@@ -217,9 +219,9 @@
         <button class="btn ghost small" id="textAttCancel">Abbrechen</button></div>
       </div>
       <div class="atts" id="attList"></div>
-      <p class="muted" style="margin-top:8px">Maximalgröße pro Anhang: 10 MB
-      (Bilder, Audio, Dateien). Größere Dateien werden abgelehnt.
-      Videos sind über „Datei“ nicht vorgesehen.</p>
+      <p class="muted" style="margin-top:8px">Maximalgröße pro Anhang: 10 MB.
+      „Bild“ = Kamera oder Galerie; „Datei“ = Dokumente aus dem Dateiordner
+      (PDF, Text, Office, Zip); „Aufnahme“ = direkt einsprechen.</p>
     </div>
   </section>
 
@@ -255,18 +257,19 @@
 </div>
 
 <dialog id="helpDlg">
-  <h2>Hilfe — What-To-Do v1.5</h2>
+  <h2>Hilfe — What-To-Do v1.5.1</h2>
   <p><b>Themengebiete</b> sind Sammlungen, z. B. „Essen“ oder „Abendbeschäftigung“.
   Lege oben ein Gebiet an und tippe es an, um Einträge hinzuzufügen.</p>
+  <p><b>Einträge öffnen:</b> Einträge einfach antippen — du kommst direkt in die
+  Detailansicht mit den Anhängen. Löschen erfolgt über den Button rechts.</p>
   <p><b>Vorschlag ziehen:</b> Der 🎲-Button wählt per reinem Zufall einen Eintrag aus.
   Gefällt er nicht: einfach noch einmal ziehen. Jeder Eintrag ist gleich wahrscheinlich.</p>
-  <p><b>Anhänge:</b> Jeder Eintrag kann Texte, Bilder, Dateien und Audio
+  <p><b>Anhänge:</b> Jeder Eintrag kann Texte, Bilder, Dokumente und Audio
   (direkt eingesprochen) enthalten. Obergrenze: <b>10 MB pro Anhang</b>.
   <b>Texte können nachträglich bearbeitet werden</b> (in der Anhangsansicht).
-  Aufnahmen werden platzsparend als WebM/Opus gespeichert.
-  Andere Dateien (auch Audio- oder Videodateien, die du irgendwo liegen hast)
-  kannst du über den „Datei“-Button anfügen — auf dem Smartphone bietet der
-  Dialog Kamera, Foto-Auswahl und Dateiordner an, keine Video-Kamera.</p>
+  Aufnahmen werden platzsparend als WebM/Opus gespeichert.</p>
+  <p><b>Datei-Typen:</b> „Bild“ = Kamera oder Galerie. „Datei“ = Dokumente aus dem
+  Dateiordner (PDF, Text, Office, Zip). Audio läuft über „Aufnahme“.</p>
   <p><b>Zurück-Navigation:</b> Der Zurück-Button der App und der System-Zurück-Button
   deines Geräts (bzw. des Browsers) tun dasselbe: Sie führen eine Ansicht zurück.
   Offene Dialoge werden ebenfalls geschlossen.</p>
@@ -289,7 +292,7 @@
   Löschen der Browserdaten löscht auch sie — regelmäßig exportieren! Beachte: Lokal geöffnete
   Dateien (Doppelklick) haben je nach Browser einen eigenen Speicher pro Datei; am stabilen
   Speicher erreichst du die App am besten immer über denselben Weg (z. B. GitHub Pages).</p>
-  <p class="muted">What-To-Do v1.5, 14.11.2026</p>
+  <p class="muted">What-To-Do v1.5.1, 14.11.2026</p>
   <div style="text-align:right"><button class="btn" onclick="document.getElementById('helpDlg').close()">Schließen</button></div>
 </dialog>
 
@@ -340,19 +343,13 @@
 var DB_NAME="what-to-do-db", STORE="kv", KEY="data";
 var MAX_ATTACH=10*1024*1024; // 10 MB pro Anhang
 var DEFAULT_THEME={mode:"os",dark:false,start:"20:00",end:"07:00"};
-/* Positivliste für "Datei": blendet auf Smartphones die
-   Video-Kamera-Option aus; Video-/exotische Formate sind
-   darüber nicht mehr wählbar (bewusste Entscheidung v1.5). */
-var FILE_ACCEPT=[
-  "image/*","audio/*","video/mp4","text/*","application/pdf",
-  "application/json","application/zip",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-].join(",");
+
+/* v1.5.1: "Datei" akzeptiert ausschließlich dokumentenartige
+   Endungen (KEINE Medientypen wie audio/* oder image/*). Das
+   zwingt Android-Browser, nur den Dateiordner anzubieten -
+   ohne Kamera-Optionen und ohne Mikrofon-Prompt. */
+var DOC_ACCEPT=".pdf,.txt,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,"
+             +".odt,.ods,.odp,.zip,.json,.html,.htm,.epub";
 
 /* ===================== Speicher (IndexedDB) ===================== */
 var db=null;
@@ -550,19 +547,22 @@ function renderEntries(){
   if(a.entries.length===0){ el.innerHTML='<p class="muted">Noch keine Einträge.</p>'; return; }
   a.entries.forEach(function(e){
     var d=document.createElement("div"); d.className="entry-item";
-    var attCount=e.attachments.length;
-    d.innerHTML='<div class="title">'+esc(e.name)+'</div>'+
-      '<div class="att">'+(attCount?attCount+" Anhang/Anhänge":"keine Anhänge")+'</div>';
+    /* v1.5.1: linker Block (Titel + Anhangszahl) öffnet per
+       Klick die Detailansicht; rechts nur noch Löschen */
+    var left=document.createElement("div");
+    left.innerHTML='<div class="title">'+esc(e.name)+'</div>'+
+      '<div class="att">'+(e.attachments.length?e.attachments.length+" Anhang/Anhänge":"keine Anhänge")+'</div>';
+    d.appendChild(left);
     var act=document.createElement("div"); act.className="entry-actions";
-    var edit=document.createElement("button"); edit.className="btn small"; edit.textContent="Bearbeiten";
-    edit.addEventListener("click",function(){ currentEntryId=e.id; renderDetail(); goTo("viewDetail"); });
     var del=document.createElement("button"); del.className="btn red small"; del.textContent="Löschen";
-    del.addEventListener("click",function(){
+    del.addEventListener("click",function(ev){
+      ev.stopPropagation();
       if(confirm("Eintrag „"+e.name+"“ löschen?")){
         a.entries=a.entries.filter(function(x){return x.id!==e.id;}); save(); renderEntries();
       }
     });
-    act.appendChild(edit); act.appendChild(del); d.appendChild(act);
+    act.appendChild(del); d.appendChild(act);
+    d.addEventListener("click",function(){ currentEntryId=e.id; renderDetail(); goTo("viewDetail"); });
     el.appendChild(d);
   });
 }
@@ -625,15 +625,15 @@ function renderDetail(){
     el.appendChild(d);
   });
 }
-/* v1.5: Umbenennen greift sofort überall (Liste, Brotkrumen, Titel) */
+/* Umbenennen greift sofort überall (Liste, Brotkrumen, Titel) */
 document.getElementById("saveTitle").addEventListener("click",function(){
   var e=curEntry(); if(!e) return;
   var v=document.getElementById("editTitle").value.trim();
   if(v){
     e.name=v; save();
     document.getElementById("detailTitle").textContent=e.name;
-    renderEntries();          /* Eintragsliste aktualisieren */
-    showView(currentView);    /* Brotkrumen-Leiste aktualisieren */
+    renderEntries();
+    showView(currentView);
   }
 });
 var currentViewerAttId=null;
@@ -720,14 +720,17 @@ document.getElementById("textAttSave").addEventListener("click",function(){
   save(); document.getElementById("textAttPanel").style.display="none"; renderDetail();
 });
 
-/* ---- Bild ---- */
+/* ---- Bild (Kamera oder Galerie) ---- */
 document.getElementById("attImage").addEventListener("click",function(){ pickAny("image/*","Bild"); });
 
-/* ---- Datei (Positivliste: keine Video-Kamera auf Mobilgeräten) ---- */
-document.getElementById("attFile").addEventListener("click",function(){ pickAny(FILE_ACCEPT,"Datei"); });
+/* ---- Datei: NUR Dokumente aus dem Dateiordner ---- */
+document.getElementById("attFile").addEventListener("click",function(){ pickAny(DOC_ACCEPT,"Datei"); });
 function pickAny(accept,label){
   var inp=document.createElement("input");
-  inp.type="file"; if(accept) inp.accept=accept;
+  inp.type="file";
+  if(accept) inp.accept=accept;
+  /* bewusst KEIN capture-Attribut: kein Kamera-/Recorder-Aufruf,
+     keine Berechtigungsanfrage an dieser Stelle */
   inp.onchange=function(){
     var f=inp.files[0]; if(!f) return;
     if(f.size>MAX_ATTACH){
