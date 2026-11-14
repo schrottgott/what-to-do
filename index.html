@@ -1,26 +1,29 @@
 <!DOCTYPE html>
 <!--
   ============================================================
-  What-To-Do  —  Version 1.4.2 (14.11.2026)
+  What-To-Do  —  Version 1.5 (14.11.2026)
   ============================================================
   Ideen- und Vorschlags-Tool: Themengebiete anlegen
   (z.B. "Essen", "Abendbeschäftigung"), Einträge erfassen,
   per Zufall einen Vorschlag ziehen. Anhänge: Text (editierbar),
-  Bild, Video, Datei, Audio (Upload/Aufnahme). Max. 10 MB/Anhang.
+  Bild, Datei, Audio (Aufnahme). Max. 10 MB/Anhang.
 
   VERSIONSHISTORIE
   ----------------
+  v1.5 (14.11.2026)
+    - Buttons "Video" und "Audio hochladen" entfernt (beides
+      läuft über "Datei"); "Datei" blendet über eine
+      Format-Positivliste die Video-Kamera-Option auf
+      Smartphones aus
+    - Umbenennen eines Eintrags greift jetzt sofort in allen
+      Ansichten (Eintragsliste, Brotkrumen, Titel)
   v1.4.2 (14.11.2026)
-    - FEHLERBEHEBUNG: In der Startroutine fehlte der Aufruf
-      renderAreas() - die Gebietsliste blieb daher optisch
-      leer, obwohl die Daten korrekt geladen wurden (daher der
-      falsche Eindruck "Daten weg" in v1.4/v1.4.1; die Daten
-      waren zu jedem Zeitpunkt intakt im Speicher).
+    - Startroutine: fehlendes renderAreas() ergänzt (Daten
+      wurden geladen, aber nicht angezeigt)
   v1.4.1 (14.11.2026)
-    - Anführungszeichen-Fehler im Audio-Upload-Text behoben
-      (Syntaxfehler tötete das Skript)
-    - Notfallspeichern erst nach erfolgreichem Laden
-    - Start-Diagnose im Sicherungs-Dialog
+    - Anführungszeichen-Fehler behoben; Notfallspeichern erst
+      nach erfolgreichem Laden; Start-Diagnose im
+      Sicherungs-Dialog
   v1.4 (14.11.2026)
     - Text-Anhänge editierbar; System-Zurück-Button (History)
   v1.3 (14.11.2026)
@@ -198,9 +201,7 @@
       <div class="row" style="flex-wrap:wrap">
         <button class="btn small" id="attText">📝 Text</button>
         <button class="btn small" id="attImage">🖼️ Bild</button>
-        <button class="btn small" id="attVideo">🎬 Video</button>
         <button class="btn small" id="attFile">📄 Datei</button>
-        <button class="btn small" id="attAudioUp">🎧 Audio hochladen</button>
         <button class="btn small" id="attRec">🎙️ Aufnahme</button>
       </div>
       <div id="recPanel" style="display:none;margin-top:10px">
@@ -217,7 +218,8 @@
       </div>
       <div class="atts" id="attList"></div>
       <p class="muted" style="margin-top:8px">Maximalgröße pro Anhang: 10 MB
-      (Bilder, Audio, Video, Dateien). Größere Dateien werden abgelehnt.</p>
+      (Bilder, Audio, Dateien). Größere Dateien werden abgelehnt.
+      Videos sind über „Datei“ nicht vorgesehen.</p>
     </div>
   </section>
 
@@ -253,15 +255,18 @@
 </div>
 
 <dialog id="helpDlg">
-  <h2>Hilfe — What-To-Do v1.4.2</h2>
+  <h2>Hilfe — What-To-Do v1.5</h2>
   <p><b>Themengebiete</b> sind Sammlungen, z. B. „Essen“ oder „Abendbeschäftigung“.
   Lege oben ein Gebiet an und tippe es an, um Einträge hinzuzufügen.</p>
   <p><b>Vorschlag ziehen:</b> Der 🎲-Button wählt per reinem Zufall einen Eintrag aus.
   Gefällt er nicht: einfach noch einmal ziehen. Jeder Eintrag ist gleich wahrscheinlich.</p>
-  <p><b>Anhänge:</b> Jeder Eintrag kann Texte, Bilder, Videos, Dateien und Audio
-  (Upload oder direkt eingesprochen) enthalten. Obergrenze: <b>10 MB pro Anhang</b>.
+  <p><b>Anhänge:</b> Jeder Eintrag kann Texte, Bilder, Dateien und Audio
+  (direkt eingesprochen) enthalten. Obergrenze: <b>10 MB pro Anhang</b>.
   <b>Texte können nachträglich bearbeitet werden</b> (in der Anhangsansicht).
-  Aufnahmen werden platzsparend als WebM/Opus gespeichert.</p>
+  Aufnahmen werden platzsparend als WebM/Opus gespeichert.
+  Andere Dateien (auch Audio- oder Videodateien, die du irgendwo liegen hast)
+  kannst du über den „Datei“-Button anfügen — auf dem Smartphone bietet der
+  Dialog Kamera, Foto-Auswahl und Dateiordner an, keine Video-Kamera.</p>
   <p><b>Zurück-Navigation:</b> Der Zurück-Button der App und der System-Zurück-Button
   deines Geräts (bzw. des Browsers) tun dasselbe: Sie führen eine Ansicht zurück.
   Offene Dialoge werden ebenfalls geschlossen.</p>
@@ -284,7 +289,7 @@
   Löschen der Browserdaten löscht auch sie — regelmäßig exportieren! Beachte: Lokal geöffnete
   Dateien (Doppelklick) haben je nach Browser einen eigenen Speicher pro Datei; am stabilen
   Speicher erreichst du die App am besten immer über denselben Weg (z. B. GitHub Pages).</p>
-  <p class="muted">What-To-Do v1.4.2, 14.11.2026</p>
+  <p class="muted">What-To-Do v1.5, 14.11.2026</p>
   <div style="text-align:right"><button class="btn" onclick="document.getElementById('helpDlg').close()">Schließen</button></div>
 </dialog>
 
@@ -335,6 +340,19 @@
 var DB_NAME="what-to-do-db", STORE="kv", KEY="data";
 var MAX_ATTACH=10*1024*1024; // 10 MB pro Anhang
 var DEFAULT_THEME={mode:"os",dark:false,start:"20:00",end:"07:00"};
+/* Positivliste für "Datei": blendet auf Smartphones die
+   Video-Kamera-Option aus; Video-/exotische Formate sind
+   darüber nicht mehr wählbar (bewusste Entscheidung v1.5). */
+var FILE_ACCEPT=[
+  "image/*","audio/*","video/mp4","text/*","application/pdf",
+  "application/json","application/zip",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+].join(",");
 
 /* ===================== Speicher (IndexedDB) ===================== */
 var db=null;
@@ -607,10 +625,16 @@ function renderDetail(){
     el.appendChild(d);
   });
 }
+/* v1.5: Umbenennen greift sofort überall (Liste, Brotkrumen, Titel) */
 document.getElementById("saveTitle").addEventListener("click",function(){
   var e=curEntry(); if(!e) return;
   var v=document.getElementById("editTitle").value.trim();
-  if(v){ e.name=v; save(); renderDetail(); }
+  if(v){
+    e.name=v; save();
+    document.getElementById("detailTitle").textContent=e.name;
+    renderEntries();          /* Eintragsliste aktualisieren */
+    showView(currentView);    /* Brotkrumen-Leiste aktualisieren */
+  }
 });
 var currentViewerAttId=null;
 function openViewer(attId){
@@ -696,17 +720,18 @@ document.getElementById("textAttSave").addEventListener("click",function(){
   save(); document.getElementById("textAttPanel").style.display="none"; renderDetail();
 });
 
-/* ---- Bild / Video / Datei ---- */
+/* ---- Bild ---- */
 document.getElementById("attImage").addEventListener("click",function(){ pickAny("image/*","Bild"); });
-document.getElementById("attVideo").addEventListener("click",function(){ pickAny("video/*","Video"); });
-document.getElementById("attFile").addEventListener("click",function(){ pickAny("","Datei"); });
+
+/* ---- Datei (Positivliste: keine Video-Kamera auf Mobilgeräten) ---- */
+document.getElementById("attFile").addEventListener("click",function(){ pickAny(FILE_ACCEPT,"Datei"); });
 function pickAny(accept,label){
   var inp=document.createElement("input");
   inp.type="file"; if(accept) inp.accept=accept;
   inp.onchange=function(){
     var f=inp.files[0]; if(!f) return;
     if(f.size>MAX_ATTACH){
-      alert(label+" ist "+fmtMB(f.size)+" MB — zu groß.\nMaximum: 10 MB pro Anhang.\nTipp: Video in niedrigerer Qualität aufnehmen/exportieren (z. B. 720p) oder kürzen.");
+      alert(label+" ist "+fmtMB(f.size)+" MB — zu groß.\nMaximum: 10 MB pro Anhang.");
       return;
     }
     var r=new FileReader();
@@ -722,37 +747,12 @@ function addBlobAtt(name,mime,dataUrl){
 }
 function fmtMB(n){ return (n/1048576).toFixed(1); }
 
-/* ---- Audio-Upload (korrigierter Text; ohne accept-Filter, mobil-tauglich) ---- */
-document.getElementById("attAudioUp").addEventListener("click",function(){
-  var inp=document.createElement("input");
-  inp.onchange=function(){
-    var f=inp.files[0]; if(!f) return;
-    var isAudio=(f.type&&f.type.indexOf("audio")===0)||
-                /\.(mp3|m4a|aac|ogg|oga|opus|wav|webm|flac|amr|3gp)$/i.test(f.name||"");
-    if(!isAudio){ alert("Das scheint keine Audiodatei zu sein. Nutze für andere Dateitypen den „Datei“-Button."); return; }
-    if(f.size>MAX_ATTACH){ alert("Audiodatei ist "+fmtMB(f.size)+" MB — zu groß. Maximum: 10 MB."); return; }
-    var mime=f.type||guessAudioMime(f.name);
-    var r=new FileReader();
-    r.onload=function(){ addBlobAtt(f.name,mime,r.result); };
-    r.readAsDataURL(f);
-  };
-  inp.click();
-});
-function guessAudioMime(name){
-  if(/\.mp3$/i.test(name||"")) return "audio/mpeg";
-  if(/\.m4a$|\.aac$/i.test(name||"")) return "audio/mp4";
-  if(/\.ogg$|\.oga$|\.opus$/i.test(name||"")) return "audio/ogg";
-  if(/\.wav$/i.test(name||"")) return "audio/wav";
-  if(/\.webm$/i.test(name||"")) return "audio/webm";
-  return "audio/mpeg";
-}
-
 /* ---- Audio-Aufnahme (MediaRecorder, WebM/Opus) ---- */
 var mediaRecorder=null, chunks=[], recStart=0, recTimer=null, recStream=null;
 document.getElementById("attRec").addEventListener("click",startRec);
 function startRec(){
   if(!navigator.mediaDevices||!window.MediaRecorder){
-    alert("Aufnahme wird von diesem Browser nicht unterstützt. Bitte Audio-Upload nutzen.");
+    alert("Aufnahme wird von diesem Browser nicht unterstützt.");
     return;
   }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
@@ -951,7 +951,7 @@ openDB(function(){
     ensureTheme();
     syncThemeInputs();
     applyTheme();
-    renderAreas();        /* v1.4.2: DER FIX - Gebietsliste zeichnen */
+    renderAreas();
     showView("viewAreas");
     loaded=true;
     persistState();
