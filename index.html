@@ -1,21 +1,28 @@
 <!DOCTYPE html>
 <!--
   ============================================================
-  What-To-Do  —  Version 1.5.3 (15.11.2026)
+  What-To-Do  —  Version 1.6 (17.11.2026)
   ============================================================
   Ideen- und Vorschlags-Tool: Themengebiete anlegen
   (z.B. "Essen", "Abendbeschäftigung"), Einträge erfassen,
   per Zufall einen Vorschlag ziehen. Anhänge: Text (editierbar),
   Bild, Datei (nur Dokumente), Audio (Aufnahme). Max. 10 MB/Anhang.
+  Pro Eintrag: sortierbare Liste (neueste zuerst / alphabetisch),
+  Checkliste (z. B. Utensilien) mit Abhakfunktion.
 
   VERSIONSHISTORIE
   ----------------
+  v1.6 (17.11.2026)
+    - Einträge sortierbar: Neueste zuerst (Standard),
+      Älteste zuerst, Alphabetisch; Auswahl wird gespeichert
+    - Neue Einträge erscheinen immer ganz oben
+    - bestehende Einträge erhalten beim ersten Laden
+      automatisch einen Erstell-Zeitpunkt (Reihenfolge bleibt)
+    - Checkliste pro Eintrag: Punkte hinzufügen, abhaken,
+      löschen, "Alle Haken entfernen"
   v1.5.3 (15.11.2026)
-    - Zähler in der Gebietsliste aktualisiert sofort beim
-      Hinzufügen/Löschen von Einträgen (kein Reload nötig)
-    - Einstellungen: Zurück-Button führt zur Hauptseite
-    - Antippen des Schriftzugs "What-To-Do" kehrt immer zur
-      Hauptseite (Themengebiete) zurück
+    - Gebiets-Zähler sofort aktuell; Zurück in Einstellungen;
+      Schriftzug = Home-Button
   v1.5.2 (14.11.2026)
     - Ziehungsergebnis größer, antippbar; Textanhänge zeigen
       Textanfang; alle Anhänge per Antippen öffnen
@@ -91,6 +98,7 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
         padding:14px;margin-bottom:12px}
   .card h2{margin:0 0 10px;font-size:1rem}
+  .card h2 .sortsel{float:right;font-weight:400}
   button{font-family:inherit}
   .btn{background:var(--gold);border:none;color:#fff;border-radius:9px;padding:10px 14px;
        font-size:.95rem;cursor:pointer}
@@ -99,6 +107,8 @@
   .btn.small{padding:6px 10px;font-size:.82rem}
   input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;
        background:var(--btn-bg);color:var(--ink);font-size:.95rem}
+  select{min-height:40px;padding:4px 10px;border:1px solid var(--line);
+       border-radius:10px;background:var(--btn-bg);color:var(--ink);font-size:.9rem}
   .area-list .item{display:flex;align-items:center;justify-content:space-between;
        background:var(--surface);border:1px solid var(--line);border-radius:10px;
        padding:12px;margin-bottom:8px;cursor:pointer}
@@ -150,6 +160,17 @@
   .setting-row input[type=time]{min-height:40px;padding:4px 8px;border:1px solid var(--line);
        border-radius:10px;background:var(--btn-bg);color:var(--ink);font-size:.9rem}
   #themeWindowRow[hidden]{display:none !important}
+  /* ---- Checkliste (v1.6) ---- */
+  .check-row{display:flex;align-items:center;gap:10px;background:var(--surface);
+       border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px}
+  .check-row input[type=checkbox]{width:20px;height:20px;accent-color:var(--red);
+       flex-shrink:0;cursor:pointer}
+  .check-row .label{flex:1;font-size:.92rem;min-width:0}
+  .check-row.done .label{text-decoration:line-through;color:var(--muted)}
+  .check-row .del{background:none;border:none;color:var(--muted);cursor:pointer;
+       font-size:1rem;padding:4px}
+  .check-head{display:flex;align-items:center;justify-content:space-between;margin:14px 0 2px}
+  .check-head h2{margin:0}
 </style>
 </head>
 <body>
@@ -179,7 +200,12 @@
 
   <section id="viewEntries" style="display:none">
     <div class="card">
-      <h2 id="entriesTitle">Gebiet</h2>
+      <h2 id="entriesTitle">Gebiet<span class="sortsel">
+        <select id="sortSel" title="Sortierung">
+          <option value="new">Neueste zuerst</option>
+          <option value="old">Älteste zuerst</option>
+          <option value="alpha">Alphabetisch</option>
+        </select></span></h2>
       <div class="draw-box" id="drawBox">
         <div class="muted">Bereit für einen Vorschlag?</div>
       </div>
@@ -194,7 +220,7 @@
         <button class="btn" id="addEntry">Hinzufügen</button>
       </div>
       <div id="entryList" style="margin-top:10px"></div>
-      <p class="muted" style="margin-top:6px">Eintrag antippen zum Öffnen.</p>
+      <p class="muted" style="margin-top:6px">Eintrag antippen zum Öffnen. Neue Einträge erscheinen immer ganz oben.</p>
     </div>
   </section>
 
@@ -232,6 +258,18 @@
       (PDF, Text, Office, Zip); „Aufnahme“ = direkt einsprechen.
       Anhänge durch Antippen öffnen.</p>
     </div>
+    <div class="card">
+      <div class="check-head">
+        <h2>☑️ Checkliste</h2>
+        <button class="btn ghost small" id="chkClear" style="display:none">Alle Haken entfernen</button>
+      </div>
+      <div class="row">
+        <input type="text" id="newChk" placeholder="Was wird benötigt? z. B. Topf, Backpapier …" maxlength="60">
+        <button class="btn" id="addChk">+</button>
+      </div>
+      <div id="chkList"></div>
+      <p class="muted" style="margin-top:6px">Punkte abhaken, wenn erledigt — z. B. beim Loslegen.</p>
+    </div>
   </section>
 
   <section id="viewSettings" style="display:none">
@@ -266,9 +304,15 @@
 </div>
 
 <dialog id="helpDlg">
-  <h2>Hilfe — What-To-Do v1.5.3</h2>
+  <h2>Hilfe — What-To-Do v1.6</h2>
   <p><b>Themengebiete</b> sind Sammlungen, z. B. „Essen“ oder „Abendbeschäftigung“.
   Lege oben ein Gebiet an und tippe es an, um Einträge hinzuzufügen.</p>
+  <p><b>Sortierung:</b> Oben rechts in der Eintragsansicht wählst du, ob neue
+  Einträge zuerst (<b>Standard</b>), ältere zuerst oder alphabetisch sortiert wird.
+  Neue Einträge erscheinen immer ganz oben. Die Einstellung wird gespeichert.</p>
+  <p><b>Checkliste:</b> Jeder Eintrag kann eine Checkliste haben (z. B. benötigte
+  Utensilien). Punkte hinzufügen, abhaken, einzeln entfernen — oder mit
+  „Alle Haken entfernen“ die Liste für den nächsten Gebrauch zurücksetzen.</p>
   <p><b>Vorschlag ziehen:</b> Der 🎲-Button wählt per reinem Zufall einen Eintrag aus.
   Das Ergebnis wird groß in der Box angezeigt — <b>antippe es, um den Eintrag direkt
   zu öffnen</b>. Gefällt der Vorschlag nicht: einfach noch einmal ziehen.</p>
@@ -285,7 +329,7 @@
   <p><b>Datei-Typen:</b> „Bild“ = Kamera oder Galerie. „Datei“ = Dokumente aus dem
   Dateiordner (PDF, Text, Office, Zip). Audio läuft über „Aufnahme“.</p>
   <p><b>Sicherung &amp; Teilen:</b> Export erstellt eine JSON-Datei mit allen Daten
-  (inkl. aller Anhänge und der Farbschema-Einstellung). Beim <b>Import</b> wählst du:</p>
+  (inkl. aller Anhänge, Checklisten und der Einstellungen). Beim <b>Import</b> wählst du:</p>
   <ul>
     <li><b>Zusammenführen:</b> Inhalte der Datei werden mit den vorhandenen kombiniert —
     ideal, um Sicherungen von zwei Geräten zu vereinen. Gleiche Gebiete/Einträge (gleicher Name)
@@ -303,14 +347,14 @@
   Löschen der Browserdaten löscht auch sie — regelmäßig exportieren! Beachte: Lokal geöffnete
   Dateien (Doppelklick) haben je nach Browser einen eigenen Speicher pro Datei; am stabilen
   Speicher erreichst du die App am besten immer über denselben Weg (z. B. GitHub Pages).</p>
-  <p class="muted">What-To-Do v1.5.3, 15.11.2026</p>
+  <p class="muted">What-To-Do v1.6, 17.11.2026</p>
   <div style="text-align:right"><button class="btn" onclick="document.getElementById('helpDlg').close()">Schließen</button></div>
 </dialog>
 
 <dialog id="backupDlg">
   <h2>Sicherung &amp; Teilen</h2>
   <p id="loadStatus" class="muted" style="margin-top:0">…</p>
-  <p>Export enthält <b>alle</b> Gebiete, Einträge, Anhänge (Base64-kodiert) und die Farbschema-Einstellung.</p>
+  <p>Export enthält <b>alle</b> Gebiete, Einträge, Anhänge (Base64-kodiert), Checklisten und die Einstellungen.</p>
   <div class="row" style="flex-wrap:wrap">
     <button class="btn" id="btnExport">⬇️ Exportieren</button>
     <button class="btn ghost" id="btnImport">⬆️ Importieren</button>
@@ -390,7 +434,8 @@ function loadState(cb){
 }
 
 /* ===================== Datenmodell ===================== */
-var state={areas:[],theme:{mode:"os",dark:false,start:"20:00",end:"07:00"}};
+/* Eintrag: { id, name, createdAt, attachments:[], checklist:[{id,label,done}] } */
+var state={areas:[],theme:{mode:"os",dark:false,start:"20:00",end:"07:00"},sort:"new"};
 var currentAreaId=null, currentEntryId=null;
 var lastParsedImport=null;
 
@@ -403,6 +448,26 @@ function countAttaches(){
   var n=0;
   state.areas.forEach(function(a){ a.entries.forEach(function(e){ n+=e.attachments.length; }); });
   return n;
+}
+/* v1.6: Migration - alte Einträge erhalten createdAt nach bestehender
+   Reihenfolge (älteste zuerst), Checklisten-Array wird ergänzt. */
+function migrateEntries(){
+  var stamp=Date.now()-1000000;
+  state.areas.forEach(function(a){
+    a.entries.forEach(function(e){
+      if(typeof e.createdAt!=="number"){ e.createdAt=stamp; stamp--; }
+      if(!e.checklist) e.checklist=[];
+    });
+  });
+}
+/* v1.6: Sortierung der Eintragsliste */
+function sortedEntries(area){
+  var list=area.entries.slice();
+  var mode=state.sort||"new";
+  if(mode==="alpha"){ list.sort(function(x,y){ return x.name.localeCompare(y.name,"de"); }); }
+  else if(mode==="old"){ list.sort(function(x,y){ return x.createdAt-y.createdAt; }); }
+  else { list.sort(function(x,y){ return y.createdAt-x.createdAt; }); }
+  return list;
 }
 
 /* ===================== Warnbanner ===================== */
@@ -487,7 +552,7 @@ function showView(v){
   if(v==="viewAreas"){ back.style.display="none"; crumb.textContent="Themengebiete"; }
   if(v==="viewEntries"){ back.style.display=""; crumb.textContent=curArea()?curArea().name:""; }
   if(v==="viewDetail"){ back.style.display=""; crumb.textContent=(curArea()?curArea().name:"")+" › "+(curEntry()?curEntry().name:""); }
-  if(v==="viewSettings"){ back.style.display=""; crumb.textContent="Einstellungen"; } /* v1.5.3: Zurück auch hier */
+  if(v==="viewSettings"){ back.style.display=""; crumb.textContent="Einstellungen"; }
   window.scrollTo(0,0);
 }
 function goTo(v){
@@ -496,7 +561,7 @@ function goTo(v){
     try{ history.pushState({wtd:v},""); }catch(e){}
   }
 }
-function goHome(){ /* v1.5.3: zurück zur Hauptseite, Auswahl zurücksetzen */
+function goHome(){ /* zurück zur Hauptseite, Auswahl zurücksetzen */
   currentAreaId=null; currentEntryId=null;
   renderAreas(); goTo("viewAreas");
 }
@@ -519,7 +584,7 @@ document.getElementById("btnBack").addEventListener("click",function(){
 document.getElementById("btnSettings").addEventListener("click",function(){
   goTo("viewSettings");
 });
-/* v1.5.3: Schriftzug antippen = immer zurück zur Hauptseite */
+/* Schriftzug antippen = immer zurück zur Hauptseite */
 document.getElementById("appTitle").addEventListener("click",goHome);
 
 /* ===================== Gebiete ===================== */
@@ -558,14 +623,19 @@ function resetDrawBox(){
 }
 function renderEntries(){
   var a=curArea(); if(!a) return;
-  document.getElementById("entriesTitle").textContent=a.name;
+  document.getElementById("entriesTitle").firstChild.nodeValue=a.name; /* Titel ohne das sort-Select */
   var el=document.getElementById("entryList"); el.innerHTML="";
   if(a.entries.length===0){ el.innerHTML='<p class="muted">Noch keine Einträge.</p>'; return; }
-  a.entries.forEach(function(e){
+  var list=sortedEntries(a);
+  list.forEach(function(e){
     var d=document.createElement("div"); d.className="entry-item";
     var left=document.createElement("div");
+    var attCount=e.attachments.length, chkCount=e.checklist?e.checklist.length:0;
+    var meta=[];
+    if(attCount) meta.push(attCount+" Anhang/Anhänge");
+    if(chkCount) meta.push(chkCount+" Checklisten-Punkt/Punkte");
     left.innerHTML='<div class="title">'+esc(e.name)+'</div>'+
-      '<div class="att">'+(e.attachments.length?e.attachments.length+" Anhang/Anhänge":"keine Anhänge")+'</div>';
+      '<div class="att">'+(meta.length?meta.join(", "):"keine Anhänge")+'</div>';
     d.appendChild(left);
     var act=document.createElement("div"); act.className="entry-actions";
     var del=document.createElement("button"); del.className="btn red small"; del.textContent="Löschen";
@@ -573,7 +643,7 @@ function renderEntries(){
       ev.stopPropagation();
       if(confirm("Eintrag „"+e.name+"“ löschen?")){
         a.entries=a.entries.filter(function(x){return x.id!==e.id;});
-        save(); renderEntries(); renderAreas(); /* v1.5.3: Zähler sofort aktuell */
+        save(); renderEntries(); renderAreas();
       }
     });
     act.appendChild(del); d.appendChild(act);
@@ -587,9 +657,13 @@ function addEntry(){
   var a=curArea(); if(!a) return;
   var inp=document.getElementById("newEntry"), n=inp.value.trim();
   if(!n) return;
-  a.entries.push({id:uid(),name:n,attachments:[]});
-  inp.value=""; save(); renderEntries(); renderAreas(); /* v1.5.3: Zähler sofort aktuell */
+  /* v1.6: neue Einträge immer ganz oben (neuester createdAt) */
+  a.entries.push({id:uid(),name:n,createdAt:Date.now(),attachments:[],checklist:[]});
+  inp.value=""; save(); renderEntries(); renderAreas();
 }
+document.getElementById("sortSel").addEventListener("change",function(){
+  state.sort=this.value; save(); renderEntries();
+});
 
 /* ===================== Zufall ===================== */
 document.getElementById("btnDraw").addEventListener("click",draw);
@@ -601,8 +675,9 @@ function draw(){
   }
   var pick=a.entries[Math.floor(Math.random()*a.entries.length)];
   var box=document.getElementById("drawBox");
+  var chkInfo=(pick.checklist&&pick.checklist.length)?(" · "+pick.checklist.filter(function(c){return !c.done;}).length+" offene Checkpunkte"):"";
   box.innerHTML='<div class="big">'+esc(pick.name)+'</div>'+
-    '<div class="sub">'+(pick.attachments.length?pick.attachments.length+" Anhang/Anhänge":"")+'</div>'+
+    '<div class="sub">'+(pick.attachments.length?pick.attachments.length+" Anhang/Anhänge":"")+chkInfo+'</div>'+
     '<div class="tap">Antippen öffnet den Eintrag</div>';
   box.onclick=function(){ currentEntryId=pick.id; renderDetail(); goTo("viewDetail"); };
 }
@@ -647,6 +722,7 @@ function renderDetail(){
     }
     el.appendChild(d);
   });
+  renderChecklist();
 }
 /* Umbenennen greift sofort überall (Liste, Brotkrumen, Titel) */
 document.getElementById("saveTitle").addEventListener("click",function(){
@@ -820,6 +896,58 @@ document.getElementById("recCancel").addEventListener("click",function(){
   } else { clearInterval(recTimer); document.getElementById("recPanel").style.display="none"; }
 });
 
+/* ===================== Checkliste (v1.6) ===================== */
+function renderChecklist(){
+  var e=curEntry(); if(!e) return;
+  if(!e.checklist) e.checklist=[];
+  var el=document.getElementById("chkList"); el.innerHTML="";
+  var clearBtn=document.getElementById("chkClear");
+  var hasDone=e.checklist.some(function(c){return c.done;});
+  clearBtn.style.display=hasDone?"":"none";
+  if(e.checklist.length===0){
+    el.innerHTML='<p class="muted" style="margin-top:8px">Noch keine Punkte. Trage oben ein, was benötigt wird.</p>';
+    return;
+  }
+  e.checklist.forEach(function(item){
+    var row=document.createElement("div");
+    row.className="check-row"+(item.done?" done":"");
+    var cb=document.createElement("input");
+    cb.type="checkbox"; cb.checked=!!item.done;
+    cb.addEventListener("change",function(){
+      item.done=cb.checked; save(); renderChecklist();
+    });
+    row.appendChild(cb);
+    var lab=document.createElement("span");
+    lab.className="label"; lab.textContent=item.label;
+    row.appendChild(lab);
+    var del=document.createElement("button");
+    del.className="del"; del.title="Punkt löschen"; del.textContent="✕";
+    del.addEventListener("click",function(){
+      if(confirm("Punkt „"+item.label+"“ löschen?")){
+        e.checklist=e.checklist.filter(function(x){return x.id!==item.id;});
+        save(); renderChecklist();
+      }
+    });
+    row.appendChild(del);
+    el.appendChild(row);
+  });
+}
+document.getElementById("addChk").addEventListener("click",addChk);
+document.getElementById("newChk").addEventListener("keydown",function(e){ if(e.key==="Enter") addChk(); });
+function addChk(){
+  var e=curEntry(); if(!e) return;
+  var inp=document.getElementById("newChk"), n=inp.value.trim();
+  if(!n) return;
+  if(!e.checklist) e.checklist=[];
+  e.checklist.push({id:uid(),label:n,done:false});
+  inp.value=""; save(); renderChecklist();
+}
+document.getElementById("chkClear").addEventListener("click",function(){
+  var e=curEntry(); if(!e) return;
+  e.checklist.forEach(function(c){ c.done=false; });
+  save(); renderChecklist();
+});
+
 /* ===================== Export / Import ===================== */
 function updateLoadStatus(){
   var el=document.getElementById("loadStatus");
@@ -839,7 +967,7 @@ document.getElementById("btnBackup").addEventListener("click",function(){
   if(historyReady){ try{ history.pushState({wtd:currentView,dlg:"backup"},""); }catch(e){} }
 });
 document.getElementById("btnExport").addEventListener("click",function(){
-  var payload={app:"what-to-do",version:2,exported:new Date().toISOString(),data:state};
+  var payload={app:"what-to-do",version:3,exported:new Date().toISOString(),data:state};
   var blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
   var url=URL.createObjectURL(blob);
   var a=document.createElement("a");
@@ -875,8 +1003,8 @@ document.getElementById("impReplace").addEventListener("click",function(){
     return;
   }
   state=lastParsedImport;
-  ensureTheme();
-  syncThemeInputs();
+  normalizeState();
+  syncThemeInputs(); syncSortSel();
   applyTheme();
   afterImport("Ersetzen abgeschlossen.");
 });
@@ -894,12 +1022,20 @@ function afterImport(msg){
   document.getElementById("importModeDlg").close();
   alert(msg);
 }
+function normalizeState(){
+  if(!state||!state.areas) state={areas:[]};
+  if(!state.theme) state.theme={mode:"os",dark:false,start:"20:00",end:"07:00"};
+  if(["new","old","alpha"].indexOf(state.sort)<0) state.sort="new";
+  ensureTheme();
+  migrateEntries();
+}
 function syncThemeInputs(){
   document.getElementById("themeMode").value=state.theme.mode;
   document.getElementById("themeStart").value=state.theme.start;
   document.getElementById("themeEnd").value=state.theme.end;
   document.getElementById("themeWindowRow").hidden=state.theme.mode!=="window";
 }
+function syncSortSel(){ document.getElementById("sortSel").value=state.sort||"new"; }
 
 /* --- Zusammenführen --- */
 function normName(s){ return String(s||"").trim().toLowerCase(); }
@@ -920,12 +1056,23 @@ function mergeIntoState(imp){
         if(normName(target.entries[j].name)===normName(impEntry.name)){ te=target.entries[j]; break; }
       }
       if(!te){
-        te={id:uid(),name:String(impEntry.name||"Unbenannt"),
-            attachments:(impEntry.attachments||[]).map(function(a){ return deepCopyAtt(a); })};
+        te={id:uid(),
+            name:String(impEntry.name||"Unbenannt"),
+            createdAt:(typeof impEntry.createdAt==="number")?impEntry.createdAt:Date.now(),
+            attachments:(impEntry.attachments||[]).map(function(a){ return deepCopyAtt(a); }),
+            checklist:(impEntry.checklist||[]).map(function(c){
+              return {id:uid(),label:String(c.label||""),done:!!c.done};
+            })};
         target.entries.push(te);
         stats.entries++; stats.attaches+=te.attachments.length;
         return;
       }
+      /* Checklisten beim Merge: fehlende Punkte ergänzen */
+      var importedChk=(impEntry.checklist||[]);
+      importedChk.forEach(function(ic){
+        var exists=te.checklist.some(function(tc){ return normName(tc.label)===normName(ic.label); });
+        if(!exists) te.checklist.push({id:uid(),label:String(ic.label||""),done:!!ic.done});
+      });
       (impEntry.attachments||[]).forEach(function(impAtt){
         if(attachmentExists(te.attachments,impAtt)) return;
         te.attachments.push(deepCopyAtt(impAtt)); stats.attaches++;
@@ -972,10 +1119,8 @@ openDB(function(){
       try{ state=JSON.parse(raw); }
       catch(e){ state={areas:[]}; }
     }
-    if(!state||!state.areas) state={areas:[]};
-    if(!state.theme) state.theme={mode:"os",dark:false,start:"20:00",end:"07:00"};
-    ensureTheme();
-    syncThemeInputs();
+    normalizeState();
+    syncThemeInputs(); syncSortSel();
     applyTheme();
     renderAreas();
     showView("viewAreas");
