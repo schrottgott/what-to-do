@@ -152,6 +152,13 @@
   audio{width:100%;margin-top:6px}
   video{max-width:100%;max-height:320px;border-radius:8px;display:block;margin-top:6px}
   img.thumb{max-width:120px;max-height:90px;border-radius:8px;display:block;margin-top:6px}
+  /* ---- Bild-Zoom (Anhangsansicht) ---- */
+  #zoomWrap{overflow:hidden;border-radius:8px;touch-action:none;cursor:grab}
+  #zoomWrap:active{cursor:grabbing}
+  #zoomImg{transform-origin:0 0;transition:transform .15s ease-out;
+    -webkit-user-select:none;user-select:none;pointer-events:none;display:block;max-width:100%}
+  #zoomHint{color:var(--muted);font-size:.8rem;text-align:center;margin-top:6px}
+  
   .setting-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .setting-row + .setting-row{margin-top:10px}
   .setting-row p{margin:0;font-size:.92rem}
@@ -752,7 +759,8 @@ function openViewer(attId){
     pre.style.padding="10px"; pre.style.borderRadius="8px";
     pre.textContent=att.text||""; body.appendChild(pre);
   } else if(att.mime&&att.mime.indexOf("image")===0){
-    var img=document.createElement("img"); img.style.maxWidth="100%"; img.src=att.data; body.appendChild(img);
+    var zoomDiv=document.createElement("div"); body.appendChild(zoomDiv);
+    makeZoomable(zoomDiv,att.data);
   } else if(att.mime&&att.mime.indexOf("audio")===0){
     var au=document.createElement("audio"); au.controls=true; au.src=att.data; body.appendChild(au);
   } else if(att.mime&&att.mime.indexOf("video")===0){
@@ -919,6 +927,12 @@ function renderChecklist(){
     row.appendChild(cb);
     var lab=document.createElement("span");
     lab.className="label"; lab.textContent=item.label;
+    lab.title="Antippen zum Bearbeiten";
+    lab.style.cursor="pointer";
+    lab.addEventListener("click",function(ev){
+      ev.stopPropagation();
+      editChkItem(item);
+    });
     row.appendChild(lab);
     var del=document.createElement("button");
     del.className="del"; del.title="Punkt löschen"; del.textContent="✕";
@@ -932,6 +946,16 @@ function renderChecklist(){
     el.appendChild(row);
   });
 }
+/* ---- Checklisten-Punkt nachträglich bearbeiten ---- */
+function editChkItem(item){
+  var neu=prompt("Punkt bearbeiten:",item.label);
+  if(neu===null) return;           /* Abgebrochen: nichts ändern */
+  neu=neu.trim();
+  if(!neu){ alert("Der Punkt darf nicht leer sein."); return; }
+  item.label=neu;
+  save(); renderChecklist();
+}
+  
 document.getElementById("addChk").addEventListener("click",addChk);
 document.getElementById("newChk").addEventListener("keydown",function(e){ if(e.key==="Enter") addChk(); });
 function addChk(){
@@ -1112,6 +1136,86 @@ document.addEventListener("visibilitychange",function(){ if(document.visibilityS
 /* ===================== Utils ===================== */
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
+/* ===================== Bild-Zoom ===================== */
+function makeZoomable(container,imgSrc){
+  container.innerHTML=
+    '<div id="zoomWrap"><img id="zoomImg" alt=""><div id="zoomHint">'+
+    'Doppel-Tipp oder Mausrad = rein/raus · zwei Finger ziehen = verschieben</div></div>';
+  var wrap=document.getElementById("zoomWrap");
+  var img=document.getElementById("zoomImg");
+  img.src=imgSrc;
+  var scale=1,minScale=1,maxScale=6,x=0,y=0,startDist=0,startScale=1,
+      lastX=0,lastY=0,dragging=false,lastTap=0;
+  function apply(){ img.style.transition="none";
+    img.style.transform="translate("+x+"px,"+y+"px) scale("+scale+")"; }
+  function clampPos(){
+    var r=img.getBoundingClientRect(), rr=wrap.getBoundingClientRect();
+    var mw=Math.max(0,(r.width-rr.width)/2), mh=Math.max(0,(r.height-rr.height)/2);
+    x=Math.min(mw,Math.max(-mw,x)); y=Math.min(mh,Math.max(-mh,y));
+  }
+  function reset(){ scale=1; x=0; y=0;
+    img.style.transition="transform .15s ease-out"; apply(); }
+  wrap.addEventListener("wheel",function(ev){
+    ev.preventDefault();
+    var f=ev.deltaY<0?1.2:1/1.2;
+    var ns=Math.min(maxScale,Math.max(minScale,scale*f));
+    /* Richtung Mauszeiger zoomen */
+    var rect=wrap.getBoundingClientRect();
+    var mx=ev.clientX-rect.left,my=ev.clientY-rect.top;
+    x=mx-(mx-x)*(ns/scale); y=my-(my-y)*(ns/scale);
+    scale=ns; if(scale===1) reset(); else { clampPos(); apply(); }
+  },{passive:false});
+  wrap.addEventListener("pointerdown",function(ev){
+    dragging=true; lastX=ev.clientX; lastY=ev.clientY;
+    wrap.setPointerCapture(ev.pointerId);
+    if(scale===1){
+      var now=Date.now();
+      if(now-lastTap<300){ scale=2.5; clampPos(); apply(); }
+      lastTap=now;
+    }
+  });
+  wrap.addEventListener("pointermove",function(ev){
+    if(!dragging) return;
+    if(ev.pointerType==="touch"&&ev.isPrimary===false){
+      /* Pinch: Abstand zweier Pointer nutzen */
+      var pts=wrap._pts||(wrap._pts=[]);
+      pts[ev.pointerId]=ev;
+      var keys=Object.keys(pts);
+      if(keys.length===2){
+        var a=pts[keys[0]],b=pts[keys[1]];
+        var d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+        if(startDist){
+          var ns=Math.min(maxScale,Math.max(minScale,startScale*d/startDist));
+          scale=ns; clampPos(); apply();
+        }
+        return;
+      }
+    }
+    if(scale>1){
+      x+=ev.clientX-lastX; y+=ev.clientY-lastY;
+      lastX=ev.clientX; lastY=ev.clientY; clampPos(); apply();
+    }
+  });
+  wrap.addEventListener("pointerdown",function(ev){ /* Pinch-Start messen */
+    if(ev.pointerType==="touch"){
+      var pts=wrap._pts||(wrap._pts={}); pts[ev.pointerId]=ev;
+      var keys=Object.keys(pts);
+      if(keys.length===2){
+        var a=pts[keys[0]],b=pts[keys[1]];
+        startDist=Math.hypot(a.clientX-b.clientX,a.clientX-b.clientX*0+a.clientY-b.clientY);
+        startDist=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+        startScale=scale;
+      }
+    }
+  });
+  wrap.addEventListener("pointerup",function(ev){
+    dragging=false; startDist=0;
+    if(wrap._pts){ delete wrap._pts[ev.pointerId]; }
+    if(scale<=1.01){ reset(); }
+  });
+  wrap.addEventListener("pointercancel",function(){ dragging=false; startDist=0; });
+}
+  
 /* ===================== Start ===================== */
 openDB(function(){
   loadState(function(raw){
