@@ -1136,84 +1136,136 @@ document.addEventListener("visibilitychange",function(){ if(document.visibilityS
 /* ===================== Utils ===================== */
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
-/* ===================== Bild-Zoom ===================== */
+/* ===================== Bild-Zoom (v2: stabiles Verschieben) ===================== */
 function makeZoomable(container,imgSrc){
   container.innerHTML=
     '<div id="zoomWrap"><img id="zoomImg" alt=""><div id="zoomHint">'+
-    'Doppel-Tipp oder Mausrad = rein/raus · zwei Finger ziehen = verschieben</div></div>';
+    'Doppel-Tipp oder Mausrad = rein/raus · Finger/Maus = verschieben</div></div>';
   var wrap=document.getElementById("zoomWrap");
   var img=document.getElementById("zoomImg");
   img.src=imgSrc;
-  var scale=1,minScale=1,maxScale=6,x=0,y=0,startDist=0,startScale=1,
-      lastX=0,lastY=0,dragging=false,lastTap=0;
-  function apply(){ img.style.transition="none";
-    img.style.transform="translate("+x+"px,"+y+"px) scale("+scale+")"; }
-  function clampPos(){
-    var r=img.getBoundingClientRect(), rr=wrap.getBoundingClientRect();
-    var mw=Math.max(0,(r.width-rr.width)/2), mh=Math.max(0,(r.height-rr.height)/2);
-    x=Math.min(mw,Math.max(-mw,x)); y=Math.min(mh,Math.max(-mh,y));
+  var scale=1,minScale=1,maxScale=6,x=0,y=0;
+  var wrapW=0,wrapH=0,imgW=0,imgH=0;
+
+  /* Grundmaße messen, sobald das Bild geladen ist */
+  img.onload=function(){
+    imgW=img.naturalWidth; imgH=img.naturalHeight;
+    fit();
+  };
+  function fit(){
+    var r=wrap.getBoundingClientRect();
+    wrapW=r.width; wrapH=r.height;
+    /* Bild passt sich der Box an; Basismaß = angezeigte Größe bei scale=1 */
+    var base=Math.min(wrapW/imgW,wrapH/imgH,1);
+    img._baseW=imgW*base; img._baseH=imgH*base;
+    reset();
   }
-  function reset(){ scale=1; x=0; y=0;
-    img.style.transition="transform .15s ease-out"; apply(); }
+  function apply(){
+    img.style.transform="translate("+x+"px,"+y+"px) scale("+scale+")";
+  }
+  /* Grenzen aus Basismaß × Scale berechnen (stabil, kein getBoundingClientRect) */
+  function clampPos(){
+    var w=img._baseW*scale, h=img._baseH*scale;
+    var mw=Math.max(0,(w-wrapW)/2), mh=Math.max(0,(h-wrapH)/2);
+    x=Math.min(mw,Math.max(-mw,x));
+    y=Math.min(mh,Math.max(-mh,y));
+  }
+  function reset(){
+    scale=1; x=0; y=0;
+    img.style.transition="transform .15s ease-out";
+    apply();
+  }
+  function zoomTo(ns,cx,cy){
+    ns=Math.min(maxScale,Math.max(minScale,ns));
+    if(cx!==undefined){
+      var r=wrap.getBoundingClientRect();
+      var mx=cx-r.left,my=cy-r.top;
+      x=mx-(mx-x)*(ns/scale); y=my-(my-y)*(ns/scale);
+    }
+    scale=ns;
+    if(scale<=1.01){ reset(); return; }
+    img.style.transition="none";
+    clampPos(); apply();
+  }
+
+  /* ---- Mausrad (Desktop) ---- */
   wrap.addEventListener("wheel",function(ev){
     ev.preventDefault();
-    var f=ev.deltaY<0?1.2:1/1.2;
-    var ns=Math.min(maxScale,Math.max(minScale,scale*f));
-    /* Richtung Mauszeiger zoomen */
-    var rect=wrap.getBoundingClientRect();
-    var mx=ev.clientX-rect.left,my=ev.clientY-rect.top;
-    x=mx-(mx-x)*(ns/scale); y=my-(my-y)*(ns/scale);
-    scale=ns; if(scale===1) reset(); else { clampPos(); apply(); }
+    zoomTo(scale*(ev.deltaY<0?1.2:1/1.2),ev.clientX,ev.clientY);
   },{passive:false});
-  wrap.addEventListener("pointerdown",function(ev){
-    dragging=true; lastX=ev.clientX; lastY=ev.clientY;
-    wrap.setPointerCapture(ev.pointerId);
-    if(scale===1){
+
+  /* ---- Doppel-Tipp ---- */
+  var lastTap=0;
+  wrap.addEventListener("dblclick",function(ev){
+    ev.preventDefault();
+    zoomTo(scale>1.5?1:2.5,ev.clientX,ev.clientY);
+  });
+  wrap.addEventListener("touchend",(function(){
+    return function(ev){
+      if(ev.touches.length>0) return;
       var now=Date.now();
-      if(now-lastTap<300){ scale=2.5; clampPos(); apply(); }
+      if(now-lastTap<300){ zoomTo(scale>1.5?1:2.5); ev.preventDefault(); }
       lastTap=now;
+    };
+  })());
+
+  /* ---- Pinch + Verschieben (Touch, über native Touch-Events) ---- */
+  var pinchStart=null;
+  wrap.addEventListener("touchstart",function(ev){
+    if(ev.touches.length===2){
+      var a=ev.touches[0],b=ev.touches[1];
+      pinchStart={dist:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),
+                  scale:scale,cx:(a.clientX+b.clientX)/2,cy:(a.clientY+b.clientY)/2,
+                  x:x,y:y};
     }
+  },{passive:true});
+  wrap.addEventListener("touchmove",function(ev){
+    ev.preventDefault();
+    if(ev.touches.length===2&&pinchStart){
+      var a=ev.touches[0],b=ev.touches[1];
+      var d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+      var ns=pinchStart.scale*d/pinchStart.dist;
+      var cx=(a.clientX+b.clientX)/2,cy=(a.clientY+b.clientY)/2;
+      var r=wrap.getBoundingClientRect();
+      /* Mittelpunkt des Pinch als Zoom-Zentrum, Basis aus Startpose */
+      var mx=pinchStart.cx-r.left,my=pinchStart.cy-r.top;
+      x=pinchStart.x+(mx-pinchStart.x)*(pinchStart.scale/ns)-(mx-(pinchStart.x+ (cx-pinchStart.cx)));
+      x=pinchStart.x-(mx-pinchStart.x)*(ns/pinchStart.scale-1)+(cx-pinchStart.cx);
+      y=pinchStart.y-(my-pinchStart.y)*(ns/pinchStart.scale-1)+(cy-pinchStart.cy);
+      scale=Math.min(maxScale,Math.max(minScale,ns));
+      clampPos(); apply();
+    } else if(ev.touches.length===1&&scale>1){
+      var t=ev.touches[0];
+      x+=t.clientX-(dragLast?dragLast.x:t.clientX);
+      y+=t.clientY-(dragLast?dragLast.y:t.clientY);
+      dragLast={x:t.clientX,y:t.clientY};
+      img.style.transition="none";
+      clampPos(); apply();
+    }
+  },{passive:false});
+  var dragLast=null;
+  wrap.addEventListener("touchstart",function(ev){
+    if(ev.touches.length===1){
+      dragLast={x:ev.touches[0].clientX,y:ev.touches[0].clientY};
+    }
+  },{passive:true});
+  wrap.addEventListener("touchend",function(){
+    pinchStart=null; dragLast=null;
+  },{passive:true});
+
+  /* ---- Verschieben (Maus) ---- */
+  var dragging=false,lx=0,ly=0;
+  wrap.addEventListener("mousedown",function(ev){
+    if(scale>1){ dragging=true; lx=ev.clientX; ly=ev.clientY; ev.preventDefault(); }
   });
-  wrap.addEventListener("pointermove",function(ev){
+  window.addEventListener("mousemove",function(ev){
     if(!dragging) return;
-    if(ev.pointerType==="touch"&&ev.isPrimary===false){
-      /* Pinch: Abstand zweier Pointer nutzen */
-      var pts=wrap._pts||(wrap._pts=[]);
-      pts[ev.pointerId]=ev;
-      var keys=Object.keys(pts);
-      if(keys.length===2){
-        var a=pts[keys[0]],b=pts[keys[1]];
-        var d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
-        if(startDist){
-          var ns=Math.min(maxScale,Math.max(minScale,startScale*d/startDist));
-          scale=ns; clampPos(); apply();
-        }
-        return;
-      }
-    }
-    if(scale>1){
-      x+=ev.clientX-lastX; y+=ev.clientY-lastY;
-      lastX=ev.clientX; lastY=ev.clientY; clampPos(); apply();
-    }
+    x+=ev.clientX-lx; y+=ev.clientY-ly;
+    lx=ev.clientX; ly=ev.clientY;
+    img.style.transition="none";
+    clampPos(); apply();
   });
-  wrap.addEventListener("pointerdown",function(ev){ /* Pinch-Start messen */
-    if(ev.pointerType==="touch"){
-      var pts=wrap._pts||(wrap._pts={}); pts[ev.pointerId]=ev;
-      var keys=Object.keys(pts);
-      if(keys.length===2){
-        var a=pts[keys[0]],b=pts[keys[1]];
-        startDist=Math.hypot(a.clientX-b.clientX,a.clientX-b.clientX*0+a.clientY-b.clientY);
-        startDist=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
-        startScale=scale;
-      }
-    }
-  });
-  wrap.addEventListener("pointerup",function(ev){
-    dragging=false; startDist=0;
-    if(wrap._pts){ delete wrap._pts[ev.pointerId]; }
-    if(scale<=1.01){ reset(); }
-  });
-  wrap.addEventListener("pointercancel",function(){ dragging=false; startDist=0; });
+  window.addEventListener("mouseup",function(){ dragging=false; });
 }
   
 /* ===================== Start ===================== */
