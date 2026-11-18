@@ -1155,9 +1155,10 @@ function makeZoomable(container,imgSrc){
   function fit(){
     var r=wrap.getBoundingClientRect();
     wrapW=r.width; wrapH=r.height;
-    /* Bild passt sich der Box an; Basismaß = angezeigte Größe bei scale=1 */
     var base=Math.min(wrapW/imgW,wrapH/imgH,1);
     img._baseW=imgW*base; img._baseH=imgH*base;
+    img.style.width=img._baseW+"px";   /* <-- ergänzen */
+    img.style.height="auto";
     reset();
   }
   function apply(){
@@ -1166,9 +1167,10 @@ function makeZoomable(container,imgSrc){
   /* Grenzen aus Basismaß × Scale berechnen (stabil, kein getBoundingClientRect) */
   function clampPos(){
     var w=img._baseW*scale, h=img._baseH*scale;
-    var mw=Math.max(0,(w-wrapW)/2), mh=Math.max(0,(h-wrapH)/2);
-    x=Math.min(mw,Math.max(-mw,x));
-    y=Math.min(mh,Math.max(-mh,y));
+    /* Ursprung 0 0: Bild belegt Bereich [x, x+w] — erlaubt:
+       x zwischen (wrapW - w) und 0, bis der Rand in beide Richtungen */
+    x=Math.min(0,Math.max(wrapW-w,x));
+    y=Math.min(0,Math.max(wrapH-h,y));
   }
   function reset(){
     scale=1; x=0; y=0;
